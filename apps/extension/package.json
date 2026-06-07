@@ -1,0 +1,44 @@
+{
+  "name": "@askai/extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "typecheck": "wxt prepare && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:smoke": "playwright test -c playwright.config.ts"
+  },
+  "dependencies": {
+    "@askai/core": "workspace:*",
+    "@askai/db": "workspace:*",
+    "@askai/ui": "workspace:*",
+    "@base-ui-components/react": "^1.0.0-beta.4",
+    "@wxt-dev/module-react": "1.1.3",
+    "dexie": "^4.2.1",
+    "effect": "^3.19.12",
+    "lucide-react": "^0.555.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "wxt": "^0.20.11",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@askai/config": "workspace:*",
+    "@playwright/test": "^1.56.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/chrome": "^0.1.33",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.4.22",
+    "fake-indexeddb": "^6.2.4",
+    "jsdom": "^27.2.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.18",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
