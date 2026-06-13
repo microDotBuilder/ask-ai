@@ -1,16 +1,43 @@
 import { defineConfig } from "wxt";
 
+const isDev = process.env.NODE_ENV === "development";
+const isAlpha = !isDev && process.env.ASK_AI_RELEASE_CHANNEL === "alpha";
+const iconDir = isDev ? "icon-dev" : isAlpha ? "icon-alpha" : "icon";
+const unusedIconDirs = ["icon", "icon-alpha", "icon-dev"]
+  .filter((dir) => dir !== iconDir)
+  .map((dir) => `${dir}/**`);
+const version = "0.0.0";
+const appName = isDev ? "Ask AI (dev)" : isAlpha ? "Ask AI Alpha" : "Ask AI";
+const icons = {
+  "16": `${iconDir}/16.png`,
+  "32": `${iconDir}/32.png`,
+  "48": `${iconDir}/48.png`,
+  "96": `${iconDir}/96.png`,
+  "128": `${iconDir}/128.png`,
+};
+
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
+  zip: {
+    name: "ask-ai",
+    artifactTemplate: "{{name}}-{{version}}-{{browser}}-{{manifestVersion}}.zip",
+    compressionLevel: 9,
+    exclude: [...unusedIconDirs, "**/*.map"],
+    zipSources: false,
+  },
   manifest: {
-    name: "Ask AI",
+    name: appName,
+    short_name: isAlpha ? "Ask AI Alpha" : "Ask AI",
     description: "Ask anything about the page you are viewing.",
-    version: "0.0.0",
+    version,
+    ...(isAlpha ? { version_name: `${version}-alpha` } : {}),
     minimum_chrome_version: "116",
     permissions: ["activeTab", "contextMenus", "sidePanel", "scripting", "storage"],
     host_permissions: ["<all_urls>"],
+    icons,
     action: {
-      default_title: "Ask AI",
+      default_title: appName,
+      default_icon: icons,
     },
     side_panel: {
       default_path: "sidepanel.html",

@@ -389,13 +389,15 @@ small {
 .welcome-icon {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 48px;
+  height: 48px;
   margin-bottom: 2px;
-  border: 1px solid var(--panel-border);
-  border-radius: 13px;
-  color: #bcd2ff;
-  background: linear-gradient(180deg, #1d2433, #161922);
+}
+
+.welcome-icon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 
 .welcome-state h2 {

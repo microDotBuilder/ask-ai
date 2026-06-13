@@ -5,7 +5,7 @@ import {
   quickActionDefinitions,
   walkActivePath,
 } from "@askai/core";
-import { ArrowDown, Sparkles } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addChromeMessageListener } from "../../src/chrome";
 import { modelsForSettings, type PendingQuickAction } from "../../src/product";
@@ -234,7 +234,7 @@ export function App() {
             {visibleMessages.length === 0 ? (
               <div className="welcome-state">
                 <div className="welcome-icon">
-                  <Sparkles size={18} aria-hidden="true" />
+                  <img src="/brand-logo.png" alt="Ask AI" width={48} height={48} />
                 </div>
                 <h2>How can I help with this page?</h2>
                 <p className="welcome-page">
