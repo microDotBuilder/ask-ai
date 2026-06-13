@@ -62,32 +62,6 @@ export interface StreamChatInput {
   providerOverride?: ProviderOverride;
 }
 
-export interface RetryAssistantInput {
-  userMessageId: string;
-  pageContext: PageContext;
-  tabId?: number;
-  focus?: string;
-  signal?: AbortSignal;
-  onMessageUpdate?: (message: ChatMessageRecord) => void;
-  providerOverride?: ProviderOverride;
-}
-
-export interface EditMessageInput {
-  userMessageId: string;
-  newContent: string;
-  pageContext: PageContext;
-  tabId?: number;
-  focus?: string;
-  signal?: AbortSignal;
-  onMessageUpdate?: (message: ChatMessageRecord) => void;
-  providerOverride?: ProviderOverride;
-}
-
-export interface BranchConversationInput {
-  fromUserMessageId: string;
-  tabId?: number;
-}
-
 export interface RestoredConversation {
   conversation?: ConversationRecord;
   messages: ChatMessageRecord[];
@@ -97,11 +71,6 @@ export interface StreamChatResult {
   conversation: ConversationRecord;
   userMessage: ChatMessageRecord;
   assistantMessage: ChatMessageRecord;
-}
-
-export interface BranchConversationResult {
-  conversation: ConversationRecord;
-  messages: ChatMessageRecord[];
 }
 
 function nowIso(): string {
@@ -541,6 +510,46 @@ export async function restoreActiveConversation(tabId?: number): Promise<Restore
   return { conversation, messages };
 }
 
+export async function restoreConversationById(
+  tabId: number,
+  conversationId: string,
+): Promise<RestoredConversation> {
+  await initializeDatabase();
+
+  const conversation = await createConversationRepository().get(conversationId);
+  if (!conversation) {
+    throw new ChatServiceError("Conversation not found.", "message-not-found");
+  }
+
+  const sessionRepository = createTabSessionRepository();
+  const existing = await sessionRepository.getByTabId(tabId);
+  const now = nowIso();
+
+  if (existing) {
+    await sessionRepository.update(existing.id, {
+      conversationId,
+      updatedAt: now,
+    });
+  } else {
+    const tab = await chrome.tabs.get(tabId).catch(() => undefined);
+    const url = (tab?.url ?? conversation.sourceUrl ?? "about:blank") as TabSessionRecord["url"];
+    await sessionRepository.upsert({
+      id: newId(),
+      tabId,
+      windowId: tab?.windowId,
+      url,
+      title: tab?.title ?? conversation.title,
+      active: true,
+      conversationId,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const messages = await createMessageRepository().listByConversation(conversation.id);
+  return { conversation, messages };
+}
+
 export async function startNewConversation(tabId?: number): Promise<void> {
   if (!tabId) {
     return;
@@ -656,165 +665,6 @@ async function loadConversationForTab(tabId?: number): Promise<{
   return { conversation, tabSession, messages };
 }
 
-async function retryAssistantImplementation(input: RetryAssistantInput): Promise<StreamChatResult> {
-  if (!input.pageContext.text.trim()) {
-    throw new ChatServiceError("Page context is empty for this tab.", "context-unavailable");
-  }
-  const {
-    conversation: loadedConversation,
-    tabSession,
-    messages,
-  } = await loadConversationForTab(input.tabId);
-  let conversation = loadedConversation;
-  const backfilled = await backfillLinearParentage(conversation, messages);
-  if (backfilled !== messages && !conversation.activeChildId) {
-    conversation = { ...conversation, activeChildId: backfilled[0]?.id };
-  }
-
-  const userMessage = backfilled.find((message) => message.id === input.userMessageId);
-  if (userMessage?.role !== "user") {
-    throw new ChatServiceError("Target user message not found.", "message-not-found");
-  }
-
-  const settings = await readSettings(chrome.storage.local);
-  const providerId =
-    input.providerOverride?.providerId ?? userMessage.providerId ?? settings.defaultProviderId;
-  const modelId = input.providerOverride?.modelId ?? userMessage.modelId ?? settings.defaultModelId;
-  const apiKey = await resolveApiKey(providerId);
-
-  const { path: activePath } = walkActivePath(conversation, backfilled);
-  let userIndex = activePath.findIndex((message) => message.id === userMessage.id);
-  let pathWithUser = activePath;
-  if (userIndex === -1) {
-    const switched = await switchActivePathTo(conversation, backfilled, userMessage);
-    conversation = switched.conversation;
-    pathWithUser = switched.path;
-    userIndex = pathWithUser.findIndex((message) => message.id === userMessage.id);
-    if (userIndex === -1) {
-      throw new ChatServiceError("Target user message is not reachable.", "message-not-found");
-    }
-  }
-  const history = pathWithUser.slice(0, userIndex);
-
-  const { assistantMessage } = await runStreaming({
-    conversation,
-    pageContext: input.pageContext,
-    tabSession,
-    history,
-    question: userMessage.content,
-    focus: input.focus,
-    contextTokenCap: settings.contextTokenCap,
-    parentForAssistantId: userMessage.id,
-    providerId,
-    modelId,
-    apiKey,
-    signal: input.signal,
-    onMessageUpdate: input.onMessageUpdate,
-  });
-
-  return {
-    conversation,
-    userMessage,
-    assistantMessage,
-  };
-}
-
-async function editMessageImplementation(input: EditMessageInput): Promise<StreamChatResult> {
-  if (!input.pageContext.text.trim()) {
-    throw new ChatServiceError("Page context is empty for this tab.", "context-unavailable");
-  }
-  if (!input.newContent.trim()) {
-    throw new ChatServiceError("Edited message cannot be empty.", "message-not-found");
-  }
-
-  const {
-    conversation: loadedConversation,
-    tabSession,
-    messages,
-  } = await loadConversationForTab(input.tabId);
-  let conversation = loadedConversation;
-  const backfilled = await backfillLinearParentage(conversation, messages);
-  if (backfilled !== messages && !conversation.activeChildId) {
-    conversation = { ...conversation, activeChildId: backfilled[0]?.id };
-  }
-
-  const originalUser = backfilled.find((message) => message.id === input.userMessageId);
-  if (originalUser?.role !== "user") {
-    throw new ChatServiceError("Target user message not found.", "message-not-found");
-  }
-
-  const settings = await readSettings(chrome.storage.local);
-  const providerId =
-    input.providerOverride?.providerId ?? originalUser.providerId ?? settings.defaultProviderId;
-  const modelId =
-    input.providerOverride?.modelId ?? originalUser.modelId ?? settings.defaultModelId;
-  const apiKey = await resolveApiKey(providerId);
-
-  const { path: activePath } = walkActivePath(conversation, backfilled);
-  let userIndex = activePath.findIndex((message) => message.id === originalUser.id);
-  let pathWithUser = activePath;
-  if (userIndex === -1) {
-    const switched = await switchActivePathTo(conversation, backfilled, originalUser);
-    conversation = switched.conversation;
-    pathWithUser = switched.path;
-    userIndex = pathWithUser.findIndex((message) => message.id === originalUser.id);
-    if (userIndex === -1) {
-      throw new ChatServiceError("Target user message is not reachable.", "message-not-found");
-    }
-  }
-  const history = pathWithUser.slice(0, userIndex);
-
-  const newUserMessage = createMessageRecord({
-    conversationId: conversation.id,
-    role: "user",
-    content: input.newContent.trim(),
-    status: "complete",
-    parentMessageId: originalUser.parentMessageId,
-    providerId,
-    modelId,
-    editedAt: nowIso(),
-  });
-
-  const messageRepository = createMessageRepository();
-  await messageRepository.create(newUserMessage);
-
-  if (originalUser.parentMessageId) {
-    await messageRepository.update(originalUser.parentMessageId, {
-      activeChildId: newUserMessage.id,
-      updatedAt: nowIso(),
-    });
-  } else {
-    await createConversationRepository().update(conversation.id, {
-      activeChildId: newUserMessage.id,
-      updatedAt: nowIso(),
-    });
-    conversation = { ...conversation, activeChildId: newUserMessage.id };
-  }
-  input.onMessageUpdate?.(newUserMessage);
-
-  const { assistantMessage } = await runStreaming({
-    conversation,
-    pageContext: input.pageContext,
-    tabSession,
-    history,
-    question: newUserMessage.content,
-    focus: input.focus,
-    contextTokenCap: settings.contextTokenCap,
-    parentForAssistantId: newUserMessage.id,
-    providerId,
-    modelId,
-    apiKey,
-    signal: input.signal,
-    onMessageUpdate: input.onMessageUpdate,
-  });
-
-  return {
-    conversation,
-    userMessage: newUserMessage,
-    assistantMessage,
-  };
-}
-
 async function switchActivePathTo(
   conversation: ConversationRecord,
   messages: ChatMessageRecord[],
@@ -873,87 +723,6 @@ export async function setActiveSibling(
   return { conversation: nextConversation, messages: refreshed };
 }
 
-export async function branchConversation(
-  input: BranchConversationInput,
-): Promise<BranchConversationResult> {
-  const { conversation, tabSession, messages } = await loadConversationForTab(input.tabId);
-  const backfilled = await backfillLinearParentage(conversation, messages);
-  const conversationForWalk =
-    backfilled === messages
-      ? conversation
-      : { ...conversation, activeChildId: conversation.activeChildId ?? backfilled[0]?.id };
-  const { path: activePath } = walkActivePath(conversationForWalk, backfilled);
-  const cutoffIndex = activePath.findIndex((message) => message.id === input.fromUserMessageId);
-  if (cutoffIndex === -1) {
-    throw new ChatServiceError("Branch source must be on the active path.", "message-not-found");
-  }
-  const prefix = activePath.slice(0, cutoffIndex + 1);
-  if (!prefix.length) {
-    throw new ChatServiceError("Nothing to branch from.", "message-not-found");
-  }
-
-  const seedQuestion =
-    prefix.find((message) => message.role === "user")?.content ?? conversation.title;
-  const newConversation = await createConversation({
-    title: titleFromQuestion(seedQuestion),
-    sourceUrl: conversation.sourceUrl ?? tabSession.url,
-    providerId: conversation.providerId,
-    modelId: conversation.modelId,
-  });
-
-  const messageRepository = createMessageRepository();
-  const idMap = new Map<string, string>();
-  const clonedMessages: ChatMessageRecord[] = [];
-
-  for (const [i, original] of prefix.entries()) {
-    const previousOriginal = i > 0 ? prefix[i - 1] : undefined;
-    const cloned = createMessageRecord({
-      conversationId: newConversation.id,
-      role: original.role,
-      content: original.content,
-      status: original.status,
-      error: original.error,
-      finishReason: original.finishReason,
-      parentMessageId: previousOriginal ? idMap.get(previousOriginal.id) : undefined,
-      providerId: original.providerId,
-      modelId: original.modelId,
-    });
-    idMap.set(original.id, cloned.id);
-    await messageRepository.create(cloned);
-    clonedMessages.push(cloned);
-  }
-
-  for (const [i, current] of clonedMessages.entries()) {
-    const next = clonedMessages[i + 1];
-    if (!next) {
-      break;
-    }
-    await messageRepository.update(current.id, {
-      activeChildId: next.id,
-      updatedAt: nowIso(),
-    });
-    clonedMessages[i] = { ...current, activeChildId: next.id };
-  }
-
-  const rootId = clonedMessages[0]?.id;
-  if (rootId) {
-    await createConversationRepository().update(newConversation.id, {
-      activeChildId: rootId,
-      updatedAt: nowIso(),
-    });
-  }
-
-  await createTabSessionRepository().update(tabSession.id, {
-    conversationId: newConversation.id,
-    updatedAt: nowIso(),
-  });
-
-  return {
-    conversation: { ...newConversation, activeChildId: rootId },
-    messages: clonedMessages,
-  };
-}
-
 export function streamChatEffect(
   input: StreamChatInput,
 ): Effect.Effect<StreamChatResult, ChatServiceError> {
@@ -977,12 +746,4 @@ export async function streamChat(input: StreamChatInput): Promise<StreamChatResu
   }
 
   return result.right;
-}
-
-export async function retryAssistant(input: RetryAssistantInput): Promise<StreamChatResult> {
-  return retryAssistantImplementation(input);
-}
-
-export async function editUserMessage(input: EditMessageInput): Promise<StreamChatResult> {
-  return editMessageImplementation(input);
 }

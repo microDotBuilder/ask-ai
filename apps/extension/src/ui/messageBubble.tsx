@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Copy,
   Check,
-  GitBranch,
   Pencil,
   RotateCcw,
   X,
@@ -60,7 +59,6 @@ export function MessageBubble({ message, siblingInfo }: MessageBubbleProps) {
   const isStreaming = useSidepanelStore((state) => state.isStreaming);
   const retryMessage = useSidepanelStore((state) => state.retryMessage);
   const editMessage = useSidepanelStore((state) => state.editMessage);
-  const branchFromMessage = useSidepanelStore((state) => state.branchFromMessage);
   const navigateSibling = useSidepanelStore((state) => state.navigateSibling);
 
   const availableModels = useMemo(() => (settings ? modelsForSettings(settings) : []), [settings]);
@@ -112,11 +110,6 @@ export function MessageBubble({ message, siblingInfo }: MessageBubbleProps) {
     void retryMessage(message.id, { providerId, modelId });
   };
 
-  const handleBranch = () => {
-    if (!isUser) return;
-    void branchFromMessage(message.id);
-  };
-
   const handleEditSubmit = () => {
     if (!isUser) return;
     const trimmed = editDraft.trim();
@@ -124,7 +117,7 @@ export function MessageBubble({ message, siblingInfo }: MessageBubbleProps) {
       setEditing(false);
       return;
     }
-    void editMessage(message.id, trimmed).then((ok) => {
+    void editMessage(trimmed).then((ok) => {
       if (ok) setEditing(false);
     });
   };
@@ -170,35 +163,15 @@ export function MessageBubble({ message, siblingInfo }: MessageBubbleProps) {
     const actionsDisabled = isStreaming;
     return (
       <div className="message-actions" data-pinned={retryOpen || undefined}>
-        <div className="message-action-wrap">
-          <button
-            aria-label="Retry"
-            className="message-action-button"
-            data-active={retryOpen || undefined}
-            disabled={actionsDisabled}
-            onClick={() => setRetryOpen((open) => !open)}
-            type="button"
-          >
-            <RotateCcw size={13} aria-hidden="true" />
-          </button>
-          {retryOpen ? (
-            <RetryDropdown
-              models={availableModels}
-              currentModelId={message.modelId ?? settings?.defaultModelId}
-              onRetrySame={handleRetrySame}
-              onRetryWithModel={handleRetryWithModel}
-              onClose={() => setRetryOpen(false)}
-            />
-          ) : null}
-        </div>
         <button
-          aria-label="Branch into new conversation"
+          aria-label="Retry"
           className="message-action-button"
+          data-active={retryOpen || undefined}
           disabled={actionsDisabled}
-          onClick={handleBranch}
+          onClick={() => setRetryOpen((open) => !open)}
           type="button"
         >
-          <GitBranch size={13} aria-hidden="true" />
+          <RotateCcw size={13} aria-hidden="true" />
         </button>
         <button
           aria-label="Edit message"
@@ -218,6 +191,15 @@ export function MessageBubble({ message, siblingInfo }: MessageBubbleProps) {
         >
           {copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
         </button>
+        {retryOpen ? (
+          <RetryDropdown
+            models={availableModels}
+            currentModelId={message.modelId ?? settings?.defaultModelId}
+            onRetrySame={handleRetrySame}
+            onRetryWithModel={handleRetryWithModel}
+            onClose={() => setRetryOpen(false)}
+          />
+        ) : null}
       </div>
     );
   };

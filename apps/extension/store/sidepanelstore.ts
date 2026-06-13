@@ -26,14 +26,13 @@ import {
   testProviderConnection,
 } from "../src/product";
 import {
-  branchConversation,
-  editUserMessage,
   restoreActiveConversation,
-  retryAssistant,
+  restoreConversationById,
   setActiveSibling,
   startNewConversation,
   streamChat,
 } from "../src/sidepanel/chat";
+import { type HistoryEntry, loadHistoryEntries } from "../src/sidepanel/history";
 import {
   type ContextState,
   contextStateFromResponse,
@@ -68,6 +67,10 @@ type SidepanelState = {
   modelSelectorSearchTerm: string;
   modelSelectorActiveProviderId: ModelProviderId;
   setupDraft: SetupDraft | null;
+  historyOpen: boolean;
+  historyEntries: HistoryEntry[] | null;
+  historyLoading: boolean;
+  historyQuery: string;
 
   setDraft: (draft: string) => void;
   setSettings: (settings: AskAiSettings | null) => void;
@@ -88,23 +91,29 @@ type SidepanelState = {
   requestContext: (mode?: ContextMode) => Promise<void>;
   refreshProductState: () => Promise<void>;
   receiveQuickAction: (action: PendingQuickAction) => Promise<void>;
-  sendPrompt: (question: string, focus?: string) => Promise<boolean>;
+  sendPrompt: (
+    question: string,
+    focus?: string,
+    override?: { providerId: ProviderId; modelId: InternalModelId },
+  ) => Promise<boolean>;
   retryMessage: (
     userMessageId: string,
     override?: { providerId: ProviderId; modelId: InternalModelId },
   ) => Promise<boolean>;
   editMessage: (
-    userMessageId: string,
     newContent: string,
     override?: { providerId: ProviderId; modelId: InternalModelId },
   ) => Promise<boolean>;
-  branchFromMessage: (userMessageId: string) => Promise<boolean>;
   navigateSibling: (targetMessageId: string) => Promise<void>;
   runQuickAction: (action: PendingQuickAction) => Promise<void>;
   selectModel: (modelId: InternalModelId) => Promise<void>;
   startFreshChat: () => Promise<void>;
   stopStreaming: () => void;
   completeSetup: (settings: AskAiSettings, status: ApiKeyStatus) => Promise<void>;
+  openHistory: () => Promise<void>;
+  closeHistory: () => void;
+  setHistoryQuery: (query: string) => void;
+  openConversation: (conversationId: string) => Promise<void>;
 };
 
 export const useSidepanelStore = create<SidepanelState>((set, get) => ({
@@ -126,6 +135,10 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
   modelSelectorSearchTerm: "",
   modelSelectorActiveProviderId: "openai",
   setupDraft: null,
+  historyOpen: false,
+  historyEntries: null,
+  historyLoading: false,
+  historyQuery: "",
 
   setDraft: (draft) => set({ draft }),
 
@@ -387,7 +400,7 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
     await get().requestContext(action.mode ?? "full-page");
   },
 
-  sendPrompt: async (question, focus) => {
+  sendPrompt: async (question, focus, override) => {
     const state = get();
     const trimmed = question.trim();
 
@@ -419,6 +432,7 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         signal: abortController.signal,
         onMessageUpdate: get().upsertMessage,
         onConversationReady: (conversation) => set({ conversation }),
+        providerOverride: override,
       });
       return true;
     } catch (caught) {
@@ -438,91 +452,19 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
   },
 
   retryMessage: async (userMessageId, override) => {
-    const state = get();
-    if (state.contextState.status !== "available" || state.isStreaming) {
+    const target = get().messages.find((message) => message.id === userMessageId);
+    if (target?.role !== "user") {
       return false;
     }
-
-    const tabId = await getActiveTabId();
-    const abortController = new AbortController();
-    set({ error: null, isStreaming: true, abortController });
-
-    try {
-      await retryAssistant({
-        userMessageId,
-        pageContext: state.contextState.context,
-        tabId,
-        focus: state.focusText,
-        signal: abortController.signal,
-        onMessageUpdate: get().upsertMessage,
-        providerOverride: override,
-      });
-      const restored = await restoreActiveConversation(tabId);
-      set({
-        messages: restored.messages,
-        conversation: restored.conversation ?? get().conversation,
-      });
-      return true;
-    } catch (caught) {
-      set({ error: caught instanceof Error ? caught.message : "Retry failed." });
-      return false;
-    } finally {
-      set({ isStreaming: false, abortController: null });
-    }
+    return get().sendPrompt(target.content, get().focusText, override);
   },
 
-  editMessage: async (userMessageId, newContent, override) => {
-    const state = get();
-    if (state.contextState.status !== "available" || state.isStreaming) {
+  editMessage: async (newContent, override) => {
+    const trimmed = newContent.trim();
+    if (!trimmed) {
       return false;
     }
-    if (!newContent.trim()) {
-      return false;
-    }
-
-    const tabId = await getActiveTabId();
-    const abortController = new AbortController();
-    set({ error: null, isStreaming: true, abortController });
-
-    try {
-      await editUserMessage({
-        userMessageId,
-        newContent,
-        pageContext: state.contextState.context,
-        tabId,
-        focus: state.focusText,
-        signal: abortController.signal,
-        onMessageUpdate: get().upsertMessage,
-        providerOverride: override,
-      });
-      const restored = await restoreActiveConversation(tabId);
-      set({
-        messages: restored.messages,
-        conversation: restored.conversation ?? get().conversation,
-      });
-      return true;
-    } catch (caught) {
-      set({ error: caught instanceof Error ? caught.message : "Edit failed." });
-      return false;
-    } finally {
-      set({ isStreaming: false, abortController: null });
-    }
-  },
-
-  branchFromMessage: async (userMessageId) => {
-    if (get().isStreaming) {
-      return false;
-    }
-    const tabId = await getActiveTabId();
-
-    try {
-      const result = await branchConversation({ fromUserMessageId: userMessageId, tabId });
-      set({ conversation: result.conversation, messages: result.messages, error: null });
-      return true;
-    } catch (caught) {
-      set({ error: caught instanceof Error ? caught.message : "Branch failed." });
-      return false;
-    }
+    return get().sendPrompt(trimmed, get().focusText, override);
   },
 
   navigateSibling: async (targetMessageId) => {
@@ -609,5 +551,66 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
     });
 
     await get().requestContext();
+  },
+
+  openHistory: async () => {
+    const state = get();
+    if (state.historyOpen) {
+      return;
+    }
+
+    set({ historyOpen: true, historyQuery: "" });
+
+    if (state.historyEntries !== null || state.historyLoading) {
+      return;
+    }
+
+    set({ historyLoading: true });
+
+    const currentDomain =
+      state.contextState.status === "available" ? state.contextState.context.domain : undefined;
+
+    try {
+      const entries = await loadHistoryEntries(currentDomain);
+      set({ historyEntries: entries, historyLoading: false });
+    } catch {
+      set({ historyEntries: [], historyLoading: false });
+    }
+  },
+
+  closeHistory: () => {
+    set({ historyOpen: false, historyQuery: "" });
+  },
+
+  setHistoryQuery: (historyQuery) => set({ historyQuery }),
+
+  openConversation: async (conversationId) => {
+    const state = get();
+    if (state.isStreaming) {
+      return;
+    }
+
+    const tabId = await getActiveTabId();
+    if (tabId === undefined) {
+      set({ error: "Active tab is unavailable." });
+      return;
+    }
+
+    set({ historyOpen: false, historyQuery: "" });
+
+    try {
+      const restored = await restoreConversationById(tabId, conversationId);
+      set({
+        conversation: restored.conversation ?? null,
+        messages: restored.messages,
+        draft: "",
+        error: null,
+        historyEntries: null,
+      });
+    } catch (caught) {
+      set({
+        error: caught instanceof Error ? caught.message : "Could not open conversation.",
+      });
+    }
   },
 }));
