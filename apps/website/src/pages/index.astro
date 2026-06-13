@@ -1,0 +1,24 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Hero from "../components/Hero.astro";
+import Features from "../components/Features.astro";
+import Providers from "../components/Providers.astro";
+import Download from "../components/Download.astro";
+import Footer from "../components/Footer.astro";
+import { getReleases } from "../lib/releases";
+
+// Resolved once at build time and baked into the static HTML.
+const { stable, alpha } = await getReleases();
+---
+
+<Base path="/">
+  <Nav />
+  <main>
+    <Hero />
+    <Features />
+    <Providers />
+    <Download stable={stable} alpha={alpha} />
+  </main>
+  <Footer />
+</Base>

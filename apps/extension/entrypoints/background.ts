@@ -7,6 +7,7 @@ import {
   type QuickActionId,
   type TabSessionUpdatedMessage,
 } from "@askai/core";
+import { createTabSessionRepository, initializeDatabase } from "@askai/db";
 import { addChromeMessageListener, sendTabMessage } from "../src/chrome";
 import { storePendingQuickAction, type PendingQuickAction } from "../src/product";
 
@@ -366,29 +367,55 @@ export default defineBackground(() => {
     upsertTabSession({ ...tab, id: tabId });
   });
 
+  chrome.tabs.onRemoved.addListener(async (tabId) => {
+    tabSessions.delete(tabId);
+    try {
+      await initializeDatabase();
+      const repository = createTabSessionRepository();
+      const existing = await repository.getByTabId(tabId);
+      if (existing) {
+        await repository.delete(existing.id);
+      }
+    } catch {
+      // Database may not be initialized in this context; ignore.
+    }
+  });
+
   addChromeMessageListener(async (message, sender) => {
+    if (sender.id !== chrome.runtime.id) {
+      return undefined;
+    }
+
     if (message.type === messageTypes.pageContextRequest) {
+      if (sender.tab) {
+        return createUnavailableResponse(
+          undefined,
+          "failed",
+          "extraction-failed",
+          "Page context can only be requested by the extension UI.",
+        );
+      }
       return requestPageContext(message.tabId, message.mode);
     }
 
-    if (message.type === messageTypes.quickActionRequest && sender.tab) {
+    if (message.type === messageTypes.quickActionRequest && sender.tab?.id) {
       await dispatchQuickAction(sender.tab, message.actionId, message.focus);
       return undefined;
     }
 
     if (message.type === messageTypes.selectionChanged) {
-      const tabId = sender.tab?.id ?? message.tabId;
-      const session =
-        tabId && tabSessions.has(tabId)
-          ? tabSessions.get(tabId)
-          : sender.tab
-            ? upsertTabSession(sender.tab)
-            : undefined;
+      if (!sender.tab?.id) {
+        return undefined;
+      }
+      const tabId = sender.tab.id;
+      const session = tabSessions.has(tabId)
+        ? tabSessions.get(tabId)
+        : upsertTabSession(sender.tab);
 
       if (session) {
         session.selectionText = message.text;
-        session.title = message.title;
-        session.url = message.url;
+        session.title = sender.tab.title ?? message.title;
+        session.url = sender.tab.url ?? message.url;
         session.updatedAt = nowIso();
         return toTabSessionMessage(session);
       }

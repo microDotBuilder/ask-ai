@@ -1,0 +1,33 @@
+---
+const families = [
+  { name: "OpenAI", src: "/providers/openai.svg" },
+  { name: "Claude", src: "/providers/anthropic.svg" },
+  { name: "Gemini", src: "/providers/gemenai.svg" },
+];
+---
+
+<section id="providers" class="border-y border-line bg-panel/30">
+  <div class="mx-auto max-w-content px-5 py-14 sm:px-8">
+    <div class="flex flex-col items-center gap-8 text-center">
+      <p class="max-w-2xl text-pretty text-ink-muted">
+        Plug in your <span class="text-ink">OpenAI</span> or
+        <span class="text-ink">OpenRouter</span> key. OpenRouter routes unlock extra model families —
+        Claude, Gemini, and more — through a single key.
+      </p>
+      <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-90">
+        {
+          families.map((p) => (
+            <div class="flex items-center gap-2.5 text-ink-muted">
+              <img src={p.src} width="26" height="26" alt="" class="opacity-80" />
+              <span class="text-sm font-medium">{p.name}</span>
+            </div>
+          ))
+        }
+        <div class="flex items-center gap-2.5 text-ink-muted">
+          <span class="flex h-[26px] w-[26px] items-center justify-center rounded-md border border-line font-mono text-[11px]">OR</span>
+          <span class="text-sm font-medium">OpenRouter</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

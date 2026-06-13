@@ -70,8 +70,14 @@ export function walkActivePath(
   const byId = new Map(messages.map((message) => [message.id, message] as const));
   const roots = byParent.get(undefined) ?? [];
   let current = pickActiveChild(roots, conversation?.activeChildId);
+  const visited = new Set<string>();
+  const maxSteps = messages.length + 1;
 
-  while (current) {
+  while (current && path.length < maxSteps) {
+    if (visited.has(current.id)) {
+      break;
+    }
+    visited.add(current.id);
     path.push(current);
     const siblingGroup = byParent.get(current.parentMessageId) ?? [current];
     if (siblingGroup.length > 1) {

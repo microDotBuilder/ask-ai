@@ -23,9 +23,11 @@
       "**",
       "!**/node_modules/**",
       "!**/.wxt/**",
+      "!**/.astro/**",
       "!**/.output/**",
       "!**/dist/**",
-      "!**/coverage/**"
+      "!**/coverage/**",
+      "!**/*.astro"
     ]
   }
 }

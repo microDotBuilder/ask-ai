@@ -1629,7 +1629,7 @@ small {
   min-height: 34px;
   border: 1px solid var(--panel-border);
   border-radius: 8px;
-  padding: 0 10px 0 30px;
+  padding: 0 36px 0 30px;
   color: var(--panel-text);
   background: var(--panel-card-strong);
   font-family: var(--panel-font);
@@ -1684,22 +1684,78 @@ small {
 }
 
 .history-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.history-row:hover,
+.history-row:focus-within {
+  background: var(--panel-card-hover);
+}
+
+.history-row-pick {
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: start;
   gap: 10px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: 0;
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--panel-text);
   background: transparent;
   text-align: left;
+  cursor: pointer;
 }
 
-.history-row:hover,
-.history-row:focus-visible {
-  background: var(--panel-card-hover);
+.history-row-delete {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--panel-muted);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.history-row:hover .history-row-delete,
+.history-row:focus-within .history-row-delete,
+.history-row-delete:focus-visible {
+  opacity: 1;
+}
+
+.history-row-delete:hover {
+  color: var(--panel-text);
+  background: var(--panel-card-strong);
+}
+
+.history-clear-all {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  transform: translateY(calc(-50% + 2px));
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--panel-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.history-clear-all:hover {
+  color: var(--panel-text);
+  background: var(--panel-card-strong);
 }
 
 .history-row-icon {

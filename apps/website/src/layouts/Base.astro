@@ -1,0 +1,50 @@
+---
+import "@fontsource-variable/inter";
+import "@fontsource-variable/roboto-mono";
+import "../styles/global.css";
+import { SITE } from "../lib/site";
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** Path-relative page, used to build the canonical URL. */
+  path?: string;
+}
+
+const { title, description = SITE.description, path = "/" } = Astro.props;
+const pageTitle = title ? `${title} — ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
+const canonical = new URL(path, SITE.url).href;
+const ogImage = new URL("/brand-logo.png", SITE.url).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icon-128.png" />
+    <meta name="theme-color" content="#121212" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:alt" content={`${SITE.name} logo`} />
+    <!-- Square brand mark → "summary" (not "summary_large_image", which expects a 2:1 banner). -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={`${SITE.name} logo`} />
+  </head>
+  <body class="min-h-screen font-sans antialiased">
+    <slot />
+  </body>
+</html>

@@ -60,6 +60,8 @@ export interface StreamChatInput {
   onMessageUpdate?: (message: ChatMessageRecord) => void;
   onConversationReady?: (conversation: ConversationRecord) => void;
   providerOverride?: ProviderOverride;
+  transientConversation?: ConversationRecord | null;
+  transientMessages?: ChatMessageRecord[];
 }
 
 export interface RestoredConversation {
@@ -568,14 +570,172 @@ export async function startNewConversation(tabId?: number): Promise<void> {
   });
 }
 
+async function streamChatTransient(
+  input: StreamChatInput,
+  settings: { defaultProviderId: ProviderId; defaultModelId: InternalModelId; contextTokenCap: number },
+): Promise<StreamChatResult> {
+  const providerId = input.providerOverride?.providerId ?? settings.defaultProviderId;
+  const modelId = input.providerOverride?.modelId ?? settings.defaultModelId;
+  const apiKey = await resolveApiKey(providerId);
+
+  const now = nowIso();
+  const conversation: ConversationRecord =
+    input.transientConversation ??
+    {
+      id: newId(),
+      title: titleFromQuestion(input.question),
+      status: "active",
+      pinned: false,
+      providerId,
+      modelId,
+      sourceUrl: input.pageContext.url as ConversationRecord["sourceUrl"],
+      lastMessageAt: now,
+      storageBytes: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+  input.onConversationReady?.(conversation);
+
+  const history = input.transientMessages ?? [];
+  const { path: activePath } = walkActivePath(conversation, history);
+  const activeLeaf = activePath[activePath.length - 1];
+
+  const userMessage = createMessageRecord({
+    conversationId: conversation.id,
+    role: "user",
+    content: input.question,
+    status: "complete",
+    parentMessageId: activeLeaf?.id,
+  });
+  input.onMessageUpdate?.(userMessage);
+
+  const providerConfig = resolveProviderRequestConfig({
+    internalModelId: modelId,
+    apiKey,
+    appTitle: "Ask AI",
+    appUrl: chrome.runtime.getURL(""),
+  });
+
+  const prompt = buildPageAwarePrompt({
+    question: input.question,
+    pageContext: input.pageContext,
+    history: activePath,
+    focus: input.focus,
+    contextTokenCap: settings.contextTokenCap,
+  });
+
+  let assistantMessage = createMessageRecord({
+    conversationId: conversation.id,
+    role: "assistant",
+    content: "",
+    status: "streaming",
+    parentMessageId: userMessage.id,
+    providerId,
+    modelId,
+  });
+  input.onMessageUpdate?.(assistantMessage);
+
+  let assistantContent = "";
+  let finishReason: string | undefined;
+
+  try {
+    const response = await fetch(`${providerConfig.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: providerConfig.headers,
+      body: JSON.stringify({
+        model: providerConfig.model,
+        messages: prompt.messages,
+        stream: true,
+      }),
+      signal: input.signal,
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new ChatServiceError(
+        body || `Provider returned HTTP ${response.status}.`,
+        "provider-http-error",
+      );
+    }
+
+    if (!response.body) {
+      throw new ChatServiceError(
+        "Provider did not return a readable stream.",
+        "stream-unavailable",
+      );
+    }
+
+    for await (const chunk of parseOpenAiCompatibleSseStream(response.body)) {
+      if (chunk.type === "error") {
+        throwForProviderChunk(chunk);
+      }
+
+      if (chunk.type === "finish") {
+        finishReason = chunk.finishReason;
+        continue;
+      }
+
+      assistantContent += chunk.content;
+      assistantMessage = {
+        ...assistantMessage,
+        content: assistantContent,
+        tokenEstimate: estimateTokens(assistantContent),
+        updatedAt: nowIso(),
+      };
+      input.onMessageUpdate?.(assistantMessage);
+    }
+
+    assistantMessage = {
+      ...assistantMessage,
+      content: assistantContent,
+      status: "complete",
+      finishReason,
+      tokenEstimate: estimateTokens(assistantContent),
+      updatedAt: nowIso(),
+    };
+    input.onMessageUpdate?.(assistantMessage);
+
+    return { conversation, userMessage, assistantMessage };
+  } catch (error) {
+    const aborted = input.signal?.aborted;
+    const message =
+      error instanceof Error
+        ? error.message
+        : aborted
+          ? "Response generation was stopped."
+          : "Chat request failed.";
+    assistantMessage = {
+      ...assistantMessage,
+      content: assistantContent,
+      status: aborted ? "cancelled" : "failed",
+      error: aborted ? undefined : { message },
+      tokenEstimate: estimateTokens(assistantContent),
+      updatedAt: nowIso(),
+    };
+    input.onMessageUpdate?.(assistantMessage);
+
+    if (aborted) {
+      return { conversation, userMessage, assistantMessage };
+    }
+
+    throw error;
+  }
+}
+
 async function streamChatImplementation(input: StreamChatInput): Promise<StreamChatResult> {
   if (!input.pageContext.text.trim()) {
     throw new ChatServiceError("Page context is empty for this tab.", "context-unavailable");
   }
 
+  const settings = await readSettings(chrome.storage.local);
+
+  if (!settings.saveHistory) {
+    return streamChatTransient(input, settings);
+  }
+
   await initializeDatabase();
 
-  const settings = await readSettings(chrome.storage.local);
   const providerId = input.providerOverride?.providerId ?? settings.defaultProviderId;
   const modelId = input.providerOverride?.modelId ?? settings.defaultModelId;
   const apiKey = await resolveApiKey(providerId);
@@ -672,8 +832,10 @@ async function switchActivePathTo(
 ): Promise<{ conversation: ConversationRecord; path: ChatMessageRecord[] }> {
   const byId = new Map(messages.map((message) => [message.id, message] as const));
   const chain: ChatMessageRecord[] = [];
+  const visited = new Set<string>();
   let cursor: ChatMessageRecord | undefined = target;
-  while (cursor) {
+  while (cursor && !visited.has(cursor.id) && chain.length <= messages.length) {
+    visited.add(cursor.id);
     chain.unshift(cursor);
     cursor = cursor.parentMessageId ? byId.get(cursor.parentMessageId) : undefined;
   }

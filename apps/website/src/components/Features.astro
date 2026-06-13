@@ -1,0 +1,61 @@
+---
+// Feature copy is drawn from the extension README so the site stays truthful to
+// what actually ships. Icons are inline lucide-style paths (no JS, no runtime).
+const features = [
+  {
+    title: "Reads the page for you",
+    body: "Extracts the readable text of the current tab and uses it as context — no copy-pasting articles, docs, or GitHub pages.",
+    path: "M4 5h16M4 10h16M4 15h10M4 20h7",
+  },
+  {
+    title: "Side-panel, per tab",
+    body: "Opens in Chrome's side panel with its own session per tab, so switching pages never mixes conversations.",
+    path: "M4 4h16v16H4zM14 4v16",
+  },
+  {
+    title: "Quick actions",
+    body: "One click to summarize, explain, rewrite, translate, simplify, or explain code — on the full page, a selection, or pasted text.",
+    path: "M13 2 3 14h7l-1 8 10-12h-7z",
+  },
+  {
+    title: "Bring your own key",
+    body: "Use your own OpenAI or OpenRouter key. OpenRouter also unlocks Claude, Gemini, and more model families through one key.",
+    path: "M21 2 12.5 10.5M15.5 6.5 18 9M3 21a3 3 0 0 0 6 0 3 3 0 0 0-6 0Zm6-6 2.5 2.5",
+  },
+  {
+    title: "Local-first & private",
+    body: "Keys and chat history are stored locally. Page content is only sent when you ask. Exclude sites or disable history anytime.",
+    path: "M12 3 4 6v6c0 5 3.4 7.7 8 9 4.6-1.3 8-4 8-9V6z",
+  },
+  {
+    title: "Your models, your way",
+    body: "Choose default providers and models, favorite the ones you use, hide the rest. Streamed responses you can stop mid-answer.",
+    path: "M4 6h16M4 12h16M4 18h16M8 3v18",
+  },
+];
+---
+
+<section id="features" class="mx-auto max-w-content px-5 py-20 sm:px-8">
+  <div class="max-w-2xl">
+    <h2 class="text-3xl font-semibold tracking-tight sm:text-4xl">A reading & research copilot, built into the browser</h2>
+    <p class="mt-4 text-ink-muted">
+      Made for long-form web content — articles, documentation, technical references, and business pages.
+    </p>
+  </div>
+
+  <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      features.map((f) => (
+        <article class="group rounded-2xl border border-line bg-panel/60 p-6 transition-colors hover:border-brand/40 hover:bg-panel">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-bg text-brand">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d={f.path} />
+            </svg>
+          </div>
+          <h3 class="mt-5 text-lg font-medium">{f.title}</h3>
+          <p class="mt-2 text-sm leading-relaxed text-ink-muted">{f.body}</p>
+        </article>
+      ))
+    }
+  </div>
+</section>

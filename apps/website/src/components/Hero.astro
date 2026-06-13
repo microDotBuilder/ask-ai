@@ -1,0 +1,88 @@
+---
+import ChromeButton from "./ChromeButton.astro";
+import { SITE } from "../lib/site";
+---
+
+<section class="page-aura relative overflow-hidden">
+  <div class="mx-auto max-w-content px-5 pb-16 pt-16 text-center sm:px-8 sm:pt-24">
+    <a
+      href={SITE.releasesUrl}
+      target="_blank"
+      rel="noopener"
+      class="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3.5 py-1.5 text-xs text-ink-muted transition-colors hover:text-ink"
+    >
+      <span class="h-1.5 w-1.5 rounded-full bg-ok"></span>
+      Manifest V3 · Bring-your-own-key · Local-first
+    </a>
+
+    <h1 class="mx-auto mt-7 max-w-3xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
+      <span class="text-gradient">Ask anything about the</span><br class="hidden sm:block" />
+      <span class="text-gradient"> page you're viewing.</span>
+    </h1>
+
+    <p class="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-ink-muted sm:text-lg">
+      Ask AI lives in Chrome's side panel. It reads the current webpage and answers questions about it —
+      summarize, explain, rewrite, translate, or dig into code, with the page context added automatically.
+    </p>
+
+    <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+      <ChromeButton size="lg" />
+      <a
+        href="#download"
+        class="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-panel px-6 py-3.5 text-base font-medium text-ink transition-colors hover:bg-panel-hover"
+      >
+        Download builds
+      </a>
+    </div>
+
+    <p class="mt-4 text-xs text-ink-faint">
+      Free · Your OpenAI / OpenRouter key, your data · No hosted backend
+    </p>
+
+    <!-- Product preview -->
+    <div class="mx-auto mt-14 max-w-4xl">
+      <div class="relative rounded-2xl border border-line bg-panel-strong p-2 shadow-glow">
+        <div class="flex items-center justify-between rounded-t-xl bg-panel px-4 py-2.5">
+          <div class="flex gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
+          </div>
+          <span class="font-mono text-[11px] text-ink-faint">chrome · side panel</span>
+          <span class="w-12"></span>
+        </div>
+        <div class="grid gap-3 rounded-b-xl bg-bg p-4 text-left sm:grid-cols-[1fr_minmax(0,18rem)]">
+          <div class="hidden flex-col gap-2 rounded-lg border border-line-soft bg-panel/40 p-4 sm:flex">
+            <div class="h-2.5 w-2/3 rounded bg-line"></div>
+            <div class="h-2.5 w-full rounded bg-line-soft"></div>
+            <div class="h-2.5 w-11/12 rounded bg-line-soft"></div>
+            <div class="h-2.5 w-4/5 rounded bg-line-soft"></div>
+            <div class="mt-2 h-2.5 w-1/2 rounded bg-line"></div>
+            <div class="h-2.5 w-full rounded bg-line-soft"></div>
+            <div class="h-2.5 w-10/12 rounded bg-line-soft"></div>
+          </div>
+          <div class="flex flex-col gap-3 rounded-lg border border-line bg-panel p-4">
+            <div class="flex items-center gap-2">
+              <img src="/brand-logo.png" width="22" height="22" alt="" class="rounded" />
+              <span class="text-sm font-medium">Ask AI</span>
+            </div>
+            <div class="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-sm text-white">
+              Summarize this article in 3 bullets.
+            </div>
+            <div class="max-w-[88%] rounded-2xl rounded-bl-sm bg-panel-strong px-3.5 py-2 text-sm text-ink">
+              <div class="space-y-1.5">
+                <div class="h-2 w-full rounded bg-line"></div>
+                <div class="h-2 w-11/12 rounded bg-line-soft"></div>
+                <div class="h-2 w-3/4 rounded bg-line-soft"></div>
+              </div>
+            </div>
+            <div class="mt-1 flex items-center gap-2 rounded-xl border border-line-soft bg-bg px-3 py-2 text-xs text-ink-faint">
+              <span>Ask about this page…</span>
+              <span class="ml-auto rounded-md bg-brand/20 px-2 py-1 font-mono text-[10px] text-[#a7c4ff]">⌘⇧A</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
