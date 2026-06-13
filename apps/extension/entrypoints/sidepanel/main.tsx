@@ -1,3 +1,5 @@
+import "@fontsource-variable/inter";
+import "@fontsource-variable/roboto-mono";
 import "@askai/ui/styles.css";
 import "./styles.css";
 

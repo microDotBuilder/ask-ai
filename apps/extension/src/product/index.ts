@@ -1,4 +1,5 @@
 import {
+  type AskAiSettings,
   defaultSettings,
   encryptApiKey,
   exportApiKeyEncryptionKey,
@@ -6,19 +7,18 @@ import {
   getBundledModelCatalog,
   getVisibleModels,
   importApiKeyEncryptionKey,
+  type ModelInfo,
+  type PendingQuickAction,
+  type ProviderId,
+  parsePendingQuickAction,
   readApiKeyEncryptionKey,
   readEncryptedApiKey,
   readSettings,
   removeEncryptedApiKey,
-  parsePendingQuickAction,
   resolveProviderRequestConfig,
   saveEncryptedApiKey,
   writeApiKeyEncryptionKey,
   writeSettings,
-  type AskAiSettings,
-  type ModelInfo,
-  type PendingQuickAction,
-  type ProviderId,
 } from "@askai/core";
 
 export type { PendingQuickAction } from "@askai/core";
@@ -35,6 +35,17 @@ export interface StorageUsageView {
 }
 
 export const pendingQuickActionStorageKey = "askai.pendingQuickAction";
+
+export const uiHintsSeenStorageKey = "askai.uiHintsSeen";
+
+export async function readUiHintsSeen(): Promise<boolean> {
+  const record = await chrome.storage.local.get(uiHintsSeenStorageKey);
+  return record[uiHintsSeenStorageKey] === true;
+}
+
+export async function markUiHintsSeen(): Promise<void> {
+  await chrome.storage.local.set({ [uiHintsSeenStorageKey]: true });
+}
 
 export const providerLabels: Record<ProviderId, string> = {
   openai: "OpenAI",
@@ -164,9 +175,13 @@ export async function storePendingQuickAction(action: PendingQuickAction): Promi
   });
 }
 
+export async function clearPendingQuickAction(): Promise<void> {
+  await chrome.storage.session.remove(pendingQuickActionStorageKey);
+}
+
 export async function takePendingQuickAction(): Promise<PendingQuickAction | undefined> {
   const record = await chrome.storage.session.get(pendingQuickActionStorageKey);
-  await chrome.storage.session.remove(pendingQuickActionStorageKey);
+  await clearPendingQuickAction();
   const action = record[pendingQuickActionStorageKey];
 
   if (action === undefined) {

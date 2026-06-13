@@ -1,0 +1,22 @@
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind base;
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind components;
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --askai-background: 0 0% 100%;
+  --askai-foreground: 222.2 84% 4.9%;
+  --askai-muted: 210 40% 96.1%;
+  --askai-muted-foreground: 215.4 16.3% 46.9%;
+  --askai-border: 214.3 31.8% 91.4%;
+  --askai-primary: 222.2 47.4% 11.2%;
+  --askai-primary-foreground: 210 40% 98%;
+}
+
+body {
+  background: hsl(var(--askai-background));
+  color: hsl(var(--askai-foreground));
+}

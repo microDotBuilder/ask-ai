@@ -11,6 +11,7 @@
     ".wxt/wxt.d.ts",
     "entrypoints/**/*.ts",
     "entrypoints/**/*.tsx",
+    "store/**/*.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "wxt.config.ts"

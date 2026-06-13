@@ -1,0 +1,32 @@
+{
+  "name": "ask-ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "@vitejs/plugin-react": "^5.1.1"
+  },
+  "scripts": {
+    "dev": "bun --filter @askai/extension dev",
+    "build": "bun run --filter '*' build",
+    "check": "bun run format:check && bun run lint && bun run typecheck && bun run build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test": "bun run --filter '*' test",
+    "test:smoke": "bun run --filter @askai/extension test:smoke",
+    "test:unit": "bun run --filter '*' test"
+  },
+  "devDependencies": {
+    "@askai/config": "workspace:*",
+    "@biomejs/biome": "^2.2.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

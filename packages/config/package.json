@@ -1,0 +1,13 @@
+{
+  "name": "@askai/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/base": "./tsconfig/base.json",
+    "./tsconfig/react": "./tsconfig/react.json",
+    "./tsconfig/extension": "./tsconfig/extension.json",
+    "./biome": "./biome/shared.json",
+    "./vitest": "./vitest/vitest.config.ts"
+  }
+}

@@ -1,0 +1,11 @@
+node_modules
+.DS_Store
+.wxt
+.output
+dist
+coverage
+playwright-report
+test-results
+*.tsbuildinfo
+*.log
+bun.lockb
