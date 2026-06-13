@@ -12,3 +12,4 @@ test-results
 *.tsbuildinfo
 *.log
 bun.lockb
+SECURITY-AUDIT.md
