@@ -3,6 +3,7 @@ import {
   buildQuickActionPrompt,
   type ChatMessageRecord,
   type ContextMode,
+  type ConversationRecord,
   type InternalModelId,
   messageTypes,
   type ProviderId,
@@ -24,7 +25,15 @@ import {
   takePendingQuickAction,
   testProviderConnection,
 } from "../src/product";
-import { restoreActiveConversation, startNewConversation, streamChat } from "../src/sidepanel/chat";
+import {
+  branchConversation,
+  editUserMessage,
+  restoreActiveConversation,
+  retryAssistant,
+  setActiveSibling,
+  startNewConversation,
+  streamChat,
+} from "../src/sidepanel/chat";
 import {
   type ContextState,
   contextStateFromResponse,
@@ -44,6 +53,7 @@ type SidepanelState = {
   contextState: ContextState;
   settings: AskAiSettings | null;
   apiKeyStatus: ApiKeyStatus | null;
+  conversation: ConversationRecord | null;
   messages: ChatMessageRecord[];
   draft: string;
   error: string | null;
@@ -79,6 +89,17 @@ type SidepanelState = {
   refreshProductState: () => Promise<void>;
   receiveQuickAction: (action: PendingQuickAction) => Promise<void>;
   sendPrompt: (question: string, focus?: string) => Promise<boolean>;
+  retryMessage: (
+    userMessageId: string,
+    override?: { providerId: ProviderId; modelId: InternalModelId },
+  ) => Promise<boolean>;
+  editMessage: (
+    userMessageId: string,
+    newContent: string,
+    override?: { providerId: ProviderId; modelId: InternalModelId },
+  ) => Promise<boolean>;
+  branchFromMessage: (userMessageId: string) => Promise<boolean>;
+  navigateSibling: (targetMessageId: string) => Promise<void>;
   runQuickAction: (action: PendingQuickAction) => Promise<void>;
   selectModel: (modelId: InternalModelId) => Promise<void>;
   startFreshChat: () => Promise<void>;
@@ -90,6 +111,7 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
   contextState: { status: "loading" },
   settings: null,
   apiKeyStatus: null,
+  conversation: null,
   messages: [],
   draft: "",
   error: null,
@@ -284,7 +306,7 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         return;
       }
 
-      set({ messages: restored.messages });
+      set({ messages: restored.messages, conversation: restored.conversation ?? null });
 
       const response = await sendRuntimeMessage({
         type: messageTypes.pageContextRequest,
@@ -396,8 +418,8 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         focus,
         signal: abortController.signal,
         onMessageUpdate: get().upsertMessage,
+        onConversationReady: (conversation) => set({ conversation }),
       });
-
       return true;
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Chat request failed.";
@@ -412,6 +434,111 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         isStreaming: false,
         abortController: null,
       });
+    }
+  },
+
+  retryMessage: async (userMessageId, override) => {
+    const state = get();
+    if (state.contextState.status !== "available" || state.isStreaming) {
+      return false;
+    }
+
+    const tabId = await getActiveTabId();
+    const abortController = new AbortController();
+    set({ error: null, isStreaming: true, abortController });
+
+    try {
+      await retryAssistant({
+        userMessageId,
+        pageContext: state.contextState.context,
+        tabId,
+        focus: state.focusText,
+        signal: abortController.signal,
+        onMessageUpdate: get().upsertMessage,
+        providerOverride: override,
+      });
+      const restored = await restoreActiveConversation(tabId);
+      set({
+        messages: restored.messages,
+        conversation: restored.conversation ?? get().conversation,
+      });
+      return true;
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Retry failed." });
+      return false;
+    } finally {
+      set({ isStreaming: false, abortController: null });
+    }
+  },
+
+  editMessage: async (userMessageId, newContent, override) => {
+    const state = get();
+    if (state.contextState.status !== "available" || state.isStreaming) {
+      return false;
+    }
+    if (!newContent.trim()) {
+      return false;
+    }
+
+    const tabId = await getActiveTabId();
+    const abortController = new AbortController();
+    set({ error: null, isStreaming: true, abortController });
+
+    try {
+      await editUserMessage({
+        userMessageId,
+        newContent,
+        pageContext: state.contextState.context,
+        tabId,
+        focus: state.focusText,
+        signal: abortController.signal,
+        onMessageUpdate: get().upsertMessage,
+        providerOverride: override,
+      });
+      const restored = await restoreActiveConversation(tabId);
+      set({
+        messages: restored.messages,
+        conversation: restored.conversation ?? get().conversation,
+      });
+      return true;
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Edit failed." });
+      return false;
+    } finally {
+      set({ isStreaming: false, abortController: null });
+    }
+  },
+
+  branchFromMessage: async (userMessageId) => {
+    if (get().isStreaming) {
+      return false;
+    }
+    const tabId = await getActiveTabId();
+
+    try {
+      const result = await branchConversation({ fromUserMessageId: userMessageId, tabId });
+      set({ conversation: result.conversation, messages: result.messages, error: null });
+      return true;
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Branch failed." });
+      return false;
+    }
+  },
+
+  navigateSibling: async (targetMessageId) => {
+    if (get().isStreaming) {
+      return;
+    }
+    const tabId = await getActiveTabId();
+    try {
+      const restored = await setActiveSibling(tabId, targetMessageId);
+      set({
+        conversation: restored.conversation ?? get().conversation,
+        messages: restored.messages,
+        error: null,
+      });
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Switch failed." });
     }
   },
 
@@ -463,6 +590,7 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
     await startNewConversation(tabId);
 
     set({
+      conversation: null,
       messages: [],
       draft: "",
       error: null,

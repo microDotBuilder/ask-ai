@@ -3,6 +3,7 @@ import {
   messageTypes,
   type QuickActionRequestMessage,
   quickActionDefinitions,
+  walkActivePath,
 } from "@askai/core";
 import { ArrowDown, Info, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +25,7 @@ export function App() {
   const settings = useSidepanelStore((state) => state.settings);
   const apiKeyStatus = useSidepanelStore((state) => state.apiKeyStatus);
   const messages = useSidepanelStore((state) => state.messages);
+  const conversation = useSidepanelStore((state) => state.conversation);
   const draft = useSidepanelStore((state) => state.draft);
   const error = useSidepanelStore((state) => state.error);
   const isStreaming = useSidepanelStore((state) => state.isStreaming);
@@ -118,6 +120,13 @@ export function App() {
     }
   }, [messages]);
 
+  const activePathResult = useMemo(
+    () => walkActivePath(conversation ?? undefined, messages),
+    [conversation, messages],
+  );
+  const visibleMessages = activePathResult.path;
+  const siblingsMap = activePathResult.siblings;
+
   const contextSummary = useMemo<ContextSummary | null>(() => {
     if (contextState.status !== "available") {
       return null;
@@ -209,7 +218,7 @@ export function App() {
       <section className="chat-area">
         <div className="chat-scroll" onScroll={handleChatScroll} ref={scrollRef}>
           <div aria-live="polite" className="chat-stream">
-            {messages.length === 0 ? (
+            {visibleMessages.length === 0 ? (
               <div className="welcome-state">
                 <div className="welcome-icon">
                   <Sparkles size={18} aria-hidden="true" />
@@ -221,8 +230,12 @@ export function App() {
               </div>
             ) : null}
 
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+            {visibleMessages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                siblingInfo={siblingsMap.get(message.id)}
+              />
             ))}
           </div>
 
@@ -238,7 +251,7 @@ export function App() {
               </button>
             ) : null}
 
-            {messages.length === 0 ? (
+            {visibleMessages.length === 0 ? (
               <div className="quick-actions">
                 {quickActionDefinitions.map((action) => (
                   <button
@@ -262,7 +275,7 @@ export function App() {
               contextState={contextState}
               draft={draft}
               focusText={focusText}
-              hasMessages={messages.length > 0}
+              hasMessages={visibleMessages.length > 0}
               isStreaming={isStreaming}
               onAbort={stopStreaming}
               onDraftChange={setDraft}

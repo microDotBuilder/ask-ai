@@ -93,6 +93,9 @@ export function installChromeMock(
       onInstalled: {
         addListener: vi.fn(),
       },
+      onStartup: {
+        addListener: vi.fn(),
+      },
       onMessage: {
         addListener: vi.fn(),
         removeListener: vi.fn(),
@@ -102,6 +105,7 @@ export function installChromeMock(
     },
     sidePanel: {
       open: vi.fn(async () => undefined),
+      setOptions: vi.fn(async () => undefined),
     },
     storage: {
       local,
@@ -115,6 +119,12 @@ export function installChromeMock(
         url: "https://example.com",
       })),
       onActivated: {
+        addListener: vi.fn(),
+      },
+      onCreated: {
+        addListener: vi.fn(),
+      },
+      onRemoved: {
         addListener: vi.fn(),
       },
       onUpdated: {
