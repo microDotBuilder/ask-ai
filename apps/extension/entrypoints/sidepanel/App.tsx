@@ -39,6 +39,7 @@ export function App() {
   const selectModel = useSidepanelStore((state) => state.selectModel);
   const startFreshChat = useSidepanelStore((state) => state.startFreshChat);
   const stopStreaming = useSidepanelStore((state) => state.stopStreaming);
+  const rebindToActiveTab = useSidepanelStore((state) => state.rebindToActiveTab);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinnedToBottomRef = useRef(true);
@@ -58,7 +59,11 @@ export function App() {
   }, [contextState, isStreaming, pendingAction, runQuickAction]);
 
   useEffect(() => {
-    return addChromeMessageListener((message) => {
+    return addChromeMessageListener((message, sender) => {
+      if (sender.id !== chrome.runtime.id || sender.tab) {
+        return undefined;
+      }
+
       if (message.type === messageTypes.quickActionRequest) {
         const quickAction = message as QuickActionRequestMessage;
         const nextAction: PendingQuickAction = {
@@ -74,6 +79,40 @@ export function App() {
       return undefined;
     });
   }, [receiveQuickAction]);
+
+  useEffect(() => {
+    const handleActivated = () => {
+      void rebindToActiveTab();
+    };
+    const handleUpdated = (
+      changedTabId: number,
+      changeInfo: chrome.tabs.OnUpdatedInfo,
+    ) => {
+      if (!changeInfo.url) {
+        return;
+      }
+      const { activeTabId } = useSidepanelStore.getState();
+      if (activeTabId === changedTabId) {
+        void rebindToActiveTab();
+      }
+    };
+    const handleWindowFocused = (windowId: number) => {
+      if (windowId === chrome.windows.WINDOW_ID_NONE) {
+        return;
+      }
+      void rebindToActiveTab();
+    };
+
+    chrome.tabs.onActivated.addListener(handleActivated);
+    chrome.tabs.onUpdated.addListener(handleUpdated);
+    chrome.windows.onFocusChanged.addListener(handleWindowFocused);
+
+    return () => {
+      chrome.tabs.onActivated.removeListener(handleActivated);
+      chrome.tabs.onUpdated.removeListener(handleUpdated);
+      chrome.windows.onFocusChanged.removeListener(handleWindowFocused);
+    };
+  }, [rebindToActiveTab]);
 
   const scrollToBottom = useCallback(() => {
     const container = scrollRef.current;

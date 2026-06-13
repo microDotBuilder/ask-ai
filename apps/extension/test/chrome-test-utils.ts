@@ -120,15 +120,19 @@ export function installChromeMock(
       })),
       onActivated: {
         addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
       onCreated: {
         addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
       onRemoved: {
         addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
       onUpdated: {
         addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
       query: vi.fn(async () => [
         {
@@ -141,6 +145,13 @@ export function installChromeMock(
       ]),
       sendMessage: tabSendMessage,
       ...options.tabs,
+    },
+    windows: {
+      WINDOW_ID_NONE: -1,
+      onFocusChanged: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
     },
   });
 

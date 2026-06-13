@@ -2,6 +2,7 @@ import type { ConversationRecord } from "@askai/core";
 import {
   createConversationRepository,
   createMessageRepository,
+  createTabSessionRepository,
   initializeDatabase,
 } from "@askai/db";
 
@@ -61,4 +62,28 @@ export async function loadHistoryEntries(
 
   entries.sort((a, b) => (a.lastMessageAt < b.lastMessageAt ? 1 : -1));
   return entries;
+}
+
+export async function deleteHistoryEntry(conversationId: string): Promise<void> {
+  await initializeDatabase();
+  await createConversationRepository().delete(conversationId);
+}
+
+export async function clearAllHistory(): Promise<void> {
+  await initializeDatabase();
+  const conversationRepository = createConversationRepository();
+  const conversations = await conversationRepository.list({ includeArchived: true });
+
+  for (const conversation of conversations) {
+    await conversationRepository.delete(conversation.id);
+  }
+}
+
+export async function deleteTabSessionByTabId(tabId: number): Promise<void> {
+  await initializeDatabase();
+  const repository = createTabSessionRepository();
+  const existing = await repository.getByTabId(tabId);
+  if (existing) {
+    await repository.delete(existing.id);
+  }
 }

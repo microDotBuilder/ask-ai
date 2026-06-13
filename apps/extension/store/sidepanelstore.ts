@@ -32,7 +32,12 @@ import {
   startNewConversation,
   streamChat,
 } from "../src/sidepanel/chat";
-import { type HistoryEntry, loadHistoryEntries } from "../src/sidepanel/history";
+import {
+  clearAllHistory,
+  deleteHistoryEntry,
+  type HistoryEntry,
+  loadHistoryEntries,
+} from "../src/sidepanel/history";
 import {
   type ContextState,
   contextStateFromResponse,
@@ -62,6 +67,8 @@ type SidepanelState = {
   hintsSeen: boolean;
   abortController: AbortController | null;
   contextRequestId: number;
+  streamGeneration: number;
+  activeTabId: number | undefined;
   headerInfoOpen: boolean;
   modelSelectorOpen: boolean;
   modelSelectorSearchTerm: string;
@@ -114,6 +121,9 @@ type SidepanelState = {
   closeHistory: () => void;
   setHistoryQuery: (query: string) => void;
   openConversation: (conversationId: string) => Promise<void>;
+  deleteConversation: (conversationId: string) => Promise<void>;
+  clearHistory: () => Promise<void>;
+  rebindToActiveTab: () => Promise<void>;
 };
 
 export const useSidepanelStore = create<SidepanelState>((set, get) => ({
@@ -130,6 +140,8 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
   hintsSeen: true,
   abortController: null,
   contextRequestId: 0,
+  streamGeneration: 0,
+  activeTabId: undefined,
   headerInfoOpen: false,
   modelSelectorOpen: false,
   modelSelectorSearchTerm: "",
@@ -309,7 +321,11 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
 
   requestContext: async (mode = "full-page") => {
     const requestId = get().contextRequestId + 1;
-    set({ contextRequestId: requestId, contextState: { status: "loading" } });
+    set({
+      contextRequestId: requestId,
+      contextState: { status: "loading" },
+      streamGeneration: get().streamGeneration + 1,
+    });
 
     try {
       const tabId = await getActiveTabId();
@@ -319,7 +335,11 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         return;
       }
 
-      set({ messages: restored.messages, conversation: restored.conversation ?? null });
+      set({
+        activeTabId: tabId,
+        messages: restored.messages,
+        conversation: restored.conversation ?? null,
+      });
 
       const response = await sendRuntimeMessage({
         type: messageTypes.pageContextRequest,
@@ -361,6 +381,23 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         },
       });
     }
+  },
+
+  rebindToActiveTab: async () => {
+    const state = get();
+    state.abortController?.abort();
+    set({
+      abortController: null,
+      isStreaming: false,
+      conversation: null,
+      messages: [],
+      focusText: undefined,
+      draft: "",
+      error: null,
+      pendingAction: null,
+      streamGeneration: state.streamGeneration + 1,
+    });
+    await get().requestContext();
   },
 
   refreshProductState: async () => {
@@ -409,13 +446,60 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
     }
 
     const tabId = await getActiveTabId();
+    if (tabId === undefined) {
+      set({ error: "No active tab is available." });
+      return false;
+    }
+
+    if (state.activeTabId !== undefined && state.activeTabId !== tabId) {
+      set({ error: "Active tab changed — refreshing context." });
+      void get().rebindToActiveTab();
+      return false;
+    }
+
+    const cachedContext = state.contextState.context;
+    let freshResponse: Awaited<ReturnType<typeof sendRuntimeMessage>> | null = null;
+    try {
+      freshResponse = await sendRuntimeMessage({
+        type: messageTypes.pageContextRequest,
+        tabId,
+        mode: cachedContext.mode,
+      });
+    } catch {
+      set({ error: "Could not verify the active tab before sending." });
+      return false;
+    }
+
+    const freshContextState = contextStateFromResponse(freshResponse);
+    if (freshContextState.status !== "available") {
+      set({
+        contextState: freshContextState,
+        error:
+          freshContextState.status === "blocked"
+            ? "This page is now restricted — message not sent."
+            : "Page context is unavailable.",
+      });
+      return false;
+    }
+
+    if (freshContextState.context.url !== cachedContext.url) {
+      set({
+        contextState: freshContextState,
+        error: "The page changed — review the new context and resend.",
+      });
+      return false;
+    }
+
     const abortController = new AbortController();
+    const generation = state.streamGeneration + 1;
 
     set({
       draft: "",
       error: null,
       isStreaming: true,
       abortController,
+      streamGeneration: generation,
+      contextState: freshContextState,
     });
 
     if (!state.hintsSeen) {
@@ -423,19 +507,37 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
       void markUiHintsSeen().catch(() => undefined);
     }
 
+    const onMessageUpdate = (message: ChatMessageRecord) => {
+      if (get().streamGeneration !== generation) {
+        return;
+      }
+      get().upsertMessage(message);
+    };
+    const onConversationReady = (conversation: ConversationRecord) => {
+      if (get().streamGeneration !== generation) {
+        return;
+      }
+      set({ conversation });
+    };
+
     try {
       await streamChat({
         question: trimmed,
-        pageContext: state.contextState.context,
+        pageContext: freshContextState.context,
         tabId,
         focus,
         signal: abortController.signal,
-        onMessageUpdate: get().upsertMessage,
-        onConversationReady: (conversation) => set({ conversation }),
+        onMessageUpdate,
+        onConversationReady,
         providerOverride: override,
+        transientConversation: state.conversation,
+        transientMessages: state.messages,
       });
       return true;
     } catch (caught) {
+      if (get().streamGeneration !== generation) {
+        return false;
+      }
       const message = caught instanceof Error ? caught.message : "Chat request failed.";
 
       set({
@@ -444,10 +546,12 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
 
       return false;
     } finally {
-      set({
-        isStreaming: false,
-        abortController: null,
-      });
+      if (get().streamGeneration === generation) {
+        set({
+          isStreaming: false,
+          abortController: null,
+        });
+      }
     }
   },
 
@@ -612,5 +716,41 @@ export const useSidepanelStore = create<SidepanelState>((set, get) => ({
         error: caught instanceof Error ? caught.message : "Could not open conversation.",
       });
     }
+  },
+
+  deleteConversation: async (conversationId) => {
+    try {
+      await deleteHistoryEntry(conversationId);
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Could not delete conversation." });
+      return;
+    }
+
+    set((state) => {
+      const remaining = state.historyEntries
+        ? state.historyEntries.filter((entry) => entry.id !== conversationId)
+        : state.historyEntries;
+      const isCurrent = state.conversation?.id === conversationId;
+      return {
+        historyEntries: remaining,
+        conversation: isCurrent ? null : state.conversation,
+        messages: isCurrent ? [] : state.messages,
+      };
+    });
+  },
+
+  clearHistory: async () => {
+    try {
+      await clearAllHistory();
+    } catch (caught) {
+      set({ error: caught instanceof Error ? caught.message : "Could not clear history." });
+      return;
+    }
+
+    set({
+      historyEntries: [],
+      conversation: null,
+      messages: [],
+    });
   },
 }));

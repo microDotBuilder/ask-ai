@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { Globe, Search } from "lucide-react";
+import { Globe, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useSidepanelStore } from "../../store/sidepanelstore";
 import type { HistoryEntry } from "../sidepanel/history";
@@ -44,6 +44,25 @@ export function HistoryDrawer({ currentDomain }: HistoryDrawerProps) {
   const closeHistory = useSidepanelStore((state) => state.closeHistory);
   const setHistoryQuery = useSidepanelStore((state) => state.setHistoryQuery);
   const openConversation = useSidepanelStore((state) => state.openConversation);
+  const deleteConversation = useSidepanelStore((state) => state.deleteConversation);
+  const clearHistory = useSidepanelStore((state) => state.clearHistory);
+
+  const handleDelete = (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this conversation?")) {
+      return;
+    }
+    void deleteConversation(id);
+  };
+
+  const handleClearAll = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Permanently delete all saved conversations?")
+    ) {
+      return;
+    }
+    void clearHistory();
+  };
 
   const searchRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,6 +133,17 @@ export function HistoryDrawer({ currentDomain }: HistoryDrawerProps) {
             value={query}
             onChange={(event) => setHistoryQuery(event.target.value)}
           />
+          {entries && entries.length > 0 ? (
+            <button
+              type="button"
+              className="history-clear-all"
+              onClick={handleClearAll}
+              aria-label="Clear all conversations"
+              title="Clear all conversations"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
         <div className="history-body">
           {loading ? (
@@ -131,7 +161,12 @@ export function HistoryDrawer({ currentDomain }: HistoryDrawerProps) {
                   <h3 className="history-group-label">On this page ({normalizedCurrent})</h3>
                   <div className="history-rows">
                     {onPage.map((entry) => (
-                      <HistoryRow key={entry.id} entry={entry} onPick={openConversation} />
+                      <HistoryRow
+                        key={entry.id}
+                        entry={entry}
+                        onPick={openConversation}
+                        onDelete={handleDelete}
+                      />
                     ))}
                   </div>
                 </section>
@@ -143,7 +178,12 @@ export function HistoryDrawer({ currentDomain }: HistoryDrawerProps) {
                   </h3>
                   <div className="history-rows">
                     {others.map((entry) => (
-                      <HistoryRow key={entry.id} entry={entry} onPick={openConversation} />
+                      <HistoryRow
+                        key={entry.id}
+                        entry={entry}
+                        onPick={openConversation}
+                        onDelete={handleDelete}
+                      />
                     ))}
                   </div>
                 </section>
@@ -159,22 +199,42 @@ export function HistoryDrawer({ currentDomain }: HistoryDrawerProps) {
 function HistoryRow({
   entry,
   onPick,
+  onDelete,
 }: {
   entry: HistoryEntry;
   onPick: (id: string) => Promise<void>;
+  onDelete: (id: string) => void;
 }) {
   return (
-    <button type="button" className="history-row" onClick={() => void onPick(entry.id)}>
-      <span className="history-row-icon" aria-hidden="true">
-        <Globe size={14} />
-      </span>
-      <span className="history-row-copy">
-        <strong>{entry.title}</strong>
-        {entry.firstUserMessage ? <small>{entry.firstUserMessage}</small> : null}
-        <span className="history-row-meta">
-          {entry.domain || "(no page)"} · {formatRelativeTime(entry.lastMessageAt)}
+    <div className="history-row">
+      <button
+        type="button"
+        className="history-row-pick"
+        onClick={() => void onPick(entry.id)}
+      >
+        <span className="history-row-icon" aria-hidden="true">
+          <Globe size={14} />
         </span>
-      </span>
-    </button>
+        <span className="history-row-copy">
+          <strong>{entry.title}</strong>
+          {entry.firstUserMessage ? <small>{entry.firstUserMessage}</small> : null}
+          <span className="history-row-meta">
+            {entry.domain || "(no page)"} · {formatRelativeTime(entry.lastMessageAt)}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="history-row-delete"
+        onClick={(event) => {
+          event.stopPropagation();
+          onDelete(entry.id);
+        }}
+        aria-label={`Delete conversation ${entry.title}`}
+        title="Delete conversation"
+      >
+        <Trash2 size={14} aria-hidden="true" />
+      </button>
+    </div>
   );
 }

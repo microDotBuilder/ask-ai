@@ -119,7 +119,11 @@ function installSelectionFloatingButton(): void {
 export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
-    addChromeMessageListener((message) => {
+    addChromeMessageListener((message, sender) => {
+      if (sender.id !== chrome.runtime.id || sender.tab) {
+        return undefined;
+      }
+
       if (message.type !== messageTypes.pageContextRequest) {
         return undefined;
       }
