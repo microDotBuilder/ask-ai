@@ -1,4 +1,4 @@
-import type { ConversationRecord } from "@askai/core";
+import type { AskAiSettings, ConversationRecord } from "@askai/core";
 
 export interface RetentionPolicy {
   historyEnabled: boolean;
@@ -6,6 +6,22 @@ export interface RetentionPolicy {
   maxStorageBytes?: number;
   maxAgeDays?: number;
   prunePinned?: boolean;
+}
+
+/**
+ * Map the user-facing settings names onto the retention policy schema. The
+ * names diverge historically (e.g. `maxConversations` vs `maxConversationCount`),
+ * so spreading the settings object loses every limit; this helper forces an
+ * explicit translation.
+ */
+export function mapSettingsToRetentionPolicy(settings: AskAiSettings): RetentionPolicy {
+  return {
+    historyEnabled: settings.saveHistory,
+    maxConversationCount: settings.retention.maxConversations,
+    maxStorageBytes: settings.retention.maxStorageBytes,
+    maxAgeDays: settings.retention.maxAgeDays,
+    prunePinned: settings.retention.prunePinned,
+  };
 }
 
 export interface RetentionPruningPlan {
@@ -94,5 +110,57 @@ export function createRetentionPruningPlan(
   return {
     deleteConversationIds: [...deleteConversationIds],
     reasonsByConversationId,
+  };
+}
+
+export interface RetentionRepositories {
+  listConversations(): Promise<ConversationRecord[]>;
+  aggregateConversationBytes(conversationId: string): Promise<number>;
+  deleteConversation(conversationId: string): Promise<void>;
+}
+
+export interface RetentionRunSummary {
+  scannedConversations: number;
+  deletedConversations: number;
+  reasonsByConversationId: RetentionPruningPlan["reasonsByConversationId"];
+}
+
+/**
+ * Recompute each conversation's real storage size (the initially-stored
+ * `storageBytes` is set at creation time and never re-aggregated, so the
+ * storage cap would never trigger without this step).
+ */
+export async function refreshConversationStorageBytes(
+  conversations: ConversationRecord[],
+  repositories: Pick<RetentionRepositories, "aggregateConversationBytes">,
+): Promise<ConversationRecord[]> {
+  return Promise.all(
+    conversations.map(async (conversation) => {
+      const messageBytes = await repositories.aggregateConversationBytes(conversation.id);
+      return {
+        ...conversation,
+        storageBytes: conversation.storageBytes + messageBytes,
+      } satisfies ConversationRecord;
+    }),
+  );
+}
+
+export async function runRetentionPruning(
+  policy: RetentionPolicy,
+  repositories: RetentionRepositories,
+  now: Date = new Date(),
+): Promise<RetentionRunSummary> {
+  const conversations = await repositories.listConversations();
+  const aggregated = await refreshConversationStorageBytes(conversations, repositories);
+  const plan = createRetentionPruningPlan(aggregated, policy, now);
+
+  for (const conversationId of plan.deleteConversationIds) {
+    await repositories.deleteConversation(conversationId);
+  }
+
+  return {
+    scannedConversations: conversations.length,
+    deletedConversations: plan.deleteConversationIds.length,
+    reasonsByConversationId: plan.reasonsByConversationId,
   };
 }

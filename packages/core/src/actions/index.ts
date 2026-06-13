@@ -12,22 +12,22 @@ export const defaultQuickActions = [
 
 export type DefaultQuickAction = (typeof defaultQuickActions)[number];
 
-export type QuickActionId = DefaultQuickAction | (string & {});
+export type QuickActionId = DefaultQuickAction;
+
+export const QuickActionIdSchema = Schema.Literal(...defaultQuickActions);
 
 export const PendingQuickActionSchema = Schema.Struct({
-  actionId: Schema.String,
+  actionId: QuickActionIdSchema,
   tabId: Schema.optional(Schema.Number.pipe(Schema.int())),
   focus: Schema.optional(Schema.String),
   mode: Schema.optional(ContextModeSchema),
   createdAt: Schema.String,
 });
 
-export type PendingQuickAction = Schema.Schema.Type<typeof PendingQuickActionSchema> & {
-  actionId: QuickActionId;
-};
+export type PendingQuickAction = Schema.Schema.Type<typeof PendingQuickActionSchema>;
 
 export function parsePendingQuickAction(value: unknown): PendingQuickAction {
-  return Schema.decodeUnknownSync(PendingQuickActionSchema)(value) as PendingQuickAction;
+  return Schema.decodeUnknownSync(PendingQuickActionSchema)(value);
 }
 
 export interface QuickActionDefinition {

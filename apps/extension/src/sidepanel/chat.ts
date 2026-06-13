@@ -5,12 +5,10 @@ import {
   decryptApiKey,
   estimateTokens,
   type InternalModelId,
-  importApiKeyEncryptionKey,
   type PageContext,
   type ProviderId,
   type ProviderStreamChunk,
   parseOpenAiCompatibleSseStream,
-  readApiKeyEncryptionKey,
   readEncryptedApiKey,
   readSettings,
   resolveProviderRequestConfig,
@@ -26,6 +24,7 @@ import {
   initializeDatabase,
 } from "@askai/db";
 import { Effect } from "effect";
+import { getApiKeyEncryptionKey } from "../product";
 
 export type ChatServiceErrorCode =
   | "context-unavailable"
@@ -199,13 +198,13 @@ async function resolveApiKey(providerId: ProviderId): Promise<string> {
     );
   }
 
-  const encodedEncryptionKey = await readApiKeyEncryptionKey(chrome.storage.local);
-
-  if (!encodedEncryptionKey) {
+  let encryptionKey: CryptoKey;
+  try {
+    encryptionKey = await getApiKeyEncryptionKey();
+  } catch {
     throw new ChatServiceError("The saved API key cannot be decrypted.", "missing-encryption-key");
   }
 
-  const encryptionKey = await importApiKeyEncryptionKey(encodedEncryptionKey);
   return decryptApiKey(encryptedRecord, encryptionKey);
 }
 

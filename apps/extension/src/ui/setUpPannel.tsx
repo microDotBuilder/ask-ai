@@ -44,8 +44,9 @@ export function SetupPanel({ settings }: { settings: AskAiSettings }) {
         <div>
           <h2>Bring your own API key</h2>
           <p>
-            Ask AI stores your key encrypted in this browser and sends requests directly to the
-            provider you choose.
+            Ask AI stores your key locally in this browser profile and sends requests directly to
+            the provider you choose. The key is wrapped with a non-extractable browser key, but it
+            remains accessible to anyone with full access to this profile.
           </p>
         </div>
 

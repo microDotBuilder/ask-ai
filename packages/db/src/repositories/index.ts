@@ -3,6 +3,7 @@ import type {
   ContextMetrics,
   ContextSnapshot,
   ConversationRecord,
+  CryptoKeyStore,
   TabSessionRecord,
 } from "@askai/core";
 import {
@@ -119,6 +120,28 @@ export function createTabSessionRepository(database: AskAiDatabase = db) {
     },
     async delete(id: string): Promise<void> {
       await database.tabSessions.delete(id);
+    },
+  };
+}
+
+export function createCryptoKeyStore(database: AskAiDatabase = db): CryptoKeyStore {
+  return {
+    async get(id) {
+      const record = await database.secrets.get(id);
+      return record?.key;
+    },
+    async put(id, key) {
+      const now = new Date().toISOString();
+      const existing = await database.secrets.get(id);
+      await database.secrets.put({
+        id,
+        key,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      });
+    },
+    async delete(id) {
+      await database.secrets.delete(id);
     },
   };
 }

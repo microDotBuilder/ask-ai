@@ -1,8 +1,23 @@
 import { messageTypes } from "@askai/core";
 import { addChromeMessageListener, sendRuntimeMessage } from "../src/chrome";
-import { extractPageContext } from "../src/content/extraction";
+import { detectSensitivePage, extractPageContext } from "../src/content/extraction";
+
+function isTopFrame(): boolean {
+  try {
+    return window.top === window;
+  } catch {
+    return false;
+  }
+}
 
 function notifySelectionChanged(): void {
+  // Sensitive pages may turn benign at extraction time but acquire a password
+  // field or checkout form afterward — re-check every selection so we never
+  // ship the selected text from a page that just became sensitive.
+  if (detectSensitivePage()) {
+    return;
+  }
+
   const selectedText = window.getSelection()?.toString().trim();
 
   if (!selectedText) {
@@ -87,18 +102,16 @@ function installSelectionFloatingButton(): void {
 
   button.addEventListener("click", () => {
     const focus = selectedText || window.getSelection()?.toString().trim();
-    if (!focus) {
+    if (!focus || detectSensitivePage()) {
       hide();
       return;
     }
 
     hide();
-    void sendRuntimeMessage({
-      type: messageTypes.quickActionRequest,
-      actionId: "explain",
-      focus,
-      mode: "full-page",
-    });
+    // Open the side panel for the active tab. The side panel will read the
+    // selection from the tab session (populated by `selectionChanged`) so we
+    // never let a content-script-controlled prompt drive an LLM call directly.
+    void sendRuntimeMessage({ type: messageTypes.openSidePanel });
   });
 
   document.addEventListener("pointerdown", (event) => {
@@ -118,7 +131,17 @@ function installSelectionFloatingButton(): void {
 
 export default defineContentScript({
   matches: ["<all_urls>"],
+  allFrames: true,
+  matchAboutBlank: false,
   main() {
+    // Only the top frame extracts text, surfaces a floating button, or emits
+    // selection events. Sub-frame instances exist solely so the top-frame
+    // extractor can reach into same-origin iframes if needed; cross-origin
+    // iframes are surfaced via structural sensitivity checks (iframe origins).
+    if (!isTopFrame()) {
+      return;
+    }
+
     addChromeMessageListener((message, sender) => {
       if (sender.id !== chrome.runtime.id || sender.tab) {
         return undefined;

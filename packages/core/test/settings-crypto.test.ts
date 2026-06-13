@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   apiKeyEncryptionKeyStorageKey,
   apiKeyStoragePrefix,
+  type CryptoKeyStore,
   decodeBytes,
   decryptApiKey,
   defaultSettings,
@@ -9,6 +10,8 @@ import {
   encryptApiKey,
   exportApiKeyEncryptionKey,
   generateApiKeyEncryptionKey,
+  generateApiKeyEncryptionKeyNonExtractable,
+  getOrCreateApiKeyEncryptionKey,
   importApiKeyEncryptionKey,
   parseSettings,
   readApiKeyEncryptionKey,
@@ -134,5 +137,57 @@ describe("API key encryption helpers", () => {
     });
 
     await expect(readEncryptedApiKey(storage, "openai")).rejects.toThrow();
+  });
+
+  it("rejects encrypted records whose iv is not a 12-byte base64 string", async () => {
+    const storage = createStorageArea();
+    const key = await generateApiKeyEncryptionKey();
+    const record = await encryptApiKey("openai", "sk-secret", key);
+
+    await storage.set({
+      [`${apiKeyStoragePrefix}.openai`]: {
+        ...record,
+        iv: encodeBytes(new Uint8Array(8)),
+      },
+    });
+
+    await expect(readEncryptedApiKey(storage, "openai")).rejects.toThrow();
+  });
+});
+
+describe("non-extractable encryption key store", () => {
+  function createCryptoKeyStore(): CryptoKeyStore {
+    const records = new Map<string, CryptoKey>();
+    return {
+      async get(id) {
+        return records.get(id);
+      },
+      async put(id, key) {
+        records.set(id, key);
+      },
+      async delete(id) {
+        records.delete(id);
+      },
+    };
+  }
+
+  it("generates a non-extractable key whose raw bytes cannot be exported", async () => {
+    const key = await generateApiKeyEncryptionKeyNonExtractable();
+    expect(key.extractable).toBe(false);
+    await expect(crypto.subtle.exportKey("raw", key)).rejects.toThrow();
+  });
+
+  it("reuses an existing key in the store on subsequent reads", async () => {
+    const store = createCryptoKeyStore();
+    const first = await getOrCreateApiKeyEncryptionKey(store);
+    const second = await getOrCreateApiKeyEncryptionKey(store);
+    expect(second).toBe(first);
+  });
+
+  it("round-trips encrypt/decrypt with a stored non-extractable key", async () => {
+    const store = createCryptoKeyStore();
+    const key = await getOrCreateApiKeyEncryptionKey(store);
+    const record = await encryptApiKey("openai", "sk-secret", key);
+    await expect(decryptApiKey(record, key)).resolves.toBe("sk-secret");
   });
 });

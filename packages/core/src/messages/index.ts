@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import { QuickActionIdSchema } from "../actions";
 import { ContextModeSchema, PageContextSchema } from "../context";
 
 export const messageTypes = {
@@ -115,7 +116,7 @@ export const TabSessionUpdatedMessageSchema = Schema.Struct({
 
 export const QuickActionRequestMessageSchema = Schema.Struct({
   type: Schema.Literal(messageTypes.quickActionRequest),
-  actionId: Schema.String,
+  actionId: QuickActionIdSchema,
   tabId: Schema.optional(Schema.Number),
   conversationId: Schema.optional(Schema.String),
   focus: Schema.optional(Schema.String),
