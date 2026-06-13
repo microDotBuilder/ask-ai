@@ -8,7 +8,13 @@ import {
   type TabSessionUpdatedMessage,
 } from "@askai/core";
 import { createTabSessionRepository, initializeDatabase } from "@askai/db";
+import {
+  retentionAlarmName,
+  runRetentionPass,
+  scheduleRetentionAlarm,
+} from "../src/background/retention";
 import { addChromeMessageListener, sendTabMessage } from "../src/chrome";
+import { detectSensitivePageUrl } from "../src/content/extraction";
 import { storePendingQuickAction, type PendingQuickAction } from "../src/product";
 
 interface TabSession {
@@ -112,14 +118,16 @@ async function classifyUrl(tab: chrome.tabs.Tab): Promise<PageContextResponseMes
     );
   }
 
-  if (
-    ["chrome:", "chrome-extension:", "edge:", "about:", "devtools:"].includes(parsedUrl.protocol)
-  ) {
+  // Only http/https pages are eligible for extraction. Anything else (file://,
+  // data:, blob:, view-source:, chrome:, devtools:, etc.) reaches into the
+  // user's local filesystem or non-web origins and must never be sent to a
+  // third-party LLM.
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
     return createUnavailableResponse(
       tab.id,
       "unsupported",
       "browser-internal",
-      "Browser internal pages cannot be read by extensions.",
+      "Ask AI only reads regular http(s) pages.",
     );
   }
 
@@ -139,6 +147,11 @@ async function classifyUrl(tab: chrome.tabs.Tab): Promise<PageContextResponseMes
       "pdf",
       "PDF pages are not supported yet.",
     );
+  }
+
+  const urlSensitive = detectSensitivePageUrl(url);
+  if (urlSensitive) {
+    return createUnavailableResponse(tab.id, "blocked", "sensitive-page", urlSensitive.reason);
   }
 
   const settings = await readSettings(chrome.storage.local);
@@ -321,6 +334,22 @@ export default defineBackground(() => {
       title: "Ask AI: Simplify selection",
       contexts: ["selection"],
     });
+    scheduleRetentionAlarm();
+    void runRetentionPass().catch(() => {
+      // Retention is best-effort; failures shouldn't block install.
+    });
+  });
+
+  chrome.runtime.onStartup.addListener(() => {
+    scheduleRetentionAlarm();
+  });
+
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === retentionAlarmName) {
+      void runRetentionPass().catch(() => {
+        // Periodic retention is best-effort.
+      });
+    }
   });
 
   chrome.action.onClicked.addListener(async (tab) => {
@@ -398,8 +427,15 @@ export default defineBackground(() => {
       return requestPageContext(message.tabId, message.mode);
     }
 
-    if (message.type === messageTypes.quickActionRequest && sender.tab?.id) {
-      await dispatchQuickAction(sender.tab, message.actionId, message.focus);
+    if (message.type === messageTypes.quickActionRequest) {
+      // Quick actions are only dispatched from trusted background entry points
+      // (context menu / keyboard command). A content script must not be able to
+      // queue an arbitrary prompt for the LLM.
+      return undefined;
+    }
+
+    if (message.type === messageTypes.openSidePanel && sender.tab?.id) {
+      await openSidePanelForTab(sender.tab);
       return undefined;
     }
 

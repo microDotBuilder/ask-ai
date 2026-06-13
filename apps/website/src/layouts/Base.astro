@@ -12,9 +12,41 @@ interface Props {
 }
 
 const { title, description = SITE.description, path = "/" } = Astro.props;
-const pageTitle = title ? `${title} — ${SITE.name}` : `${SITE.name} — ${SITE.tagline}`;
+// Lead with the domain-anchored brand ("Askpane") — Google ranks the unique
+// token, then the descriptive phrase carries the keywords.
+const pageTitle = title
+  ? `${title} — ${SITE.brand}`
+  : `${SITE.brand} — Ask AI about any webpage in Chrome's side panel`;
 const canonical = new URL(path, SITE.url).href;
 const ogImage = new URL("/brand-logo.png", SITE.url).href;
+
+// SoftwareApplication schema — only on the homepage to keep one canonical
+// entity. Tells Google this is a free Chrome extension so it can render
+// rich results (price, category, install link).
+const isHome = path === "/";
+const softwareSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: `${SITE.brand} (${SITE.name})`,
+  alternateName: SITE.name,
+  applicationCategory: "BrowserApplication",
+  operatingSystem: "Chrome",
+  url: SITE.url,
+  description: SITE.description,
+  browserRequirements: "Requires a Chromium-based browser with Manifest V3 support",
+  downloadUrl: SITE.chromeStoreUrl || SITE.releasesUrl,
+  ...(SITE.chromeStoreUrl ? { installUrl: SITE.chromeStoreUrl } : {}),
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  publisher: {
+    "@type": "Organization",
+    name: SITE.brand,
+    url: SITE.url,
+  },
+};
 ---
 
 <!doctype html>
@@ -31,7 +63,7 @@ const ogImage = new URL("/brand-logo.png", SITE.url).href;
     <meta name="theme-color" content="#121212" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:site_name" content={SITE.brand} />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
@@ -43,6 +75,10 @@ const ogImage = new URL("/brand-logo.png", SITE.url).href;
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="twitter:image:alt" content={`${SITE.name} logo`} />
+
+    {isHome && (
+      <script type="application/ld+json" is:inline set:html={JSON.stringify(softwareSchema)} />
+    )}
   </head>
   <body class="min-h-screen font-sans antialiased">
     <slot />

@@ -5,10 +5,14 @@
 const repo = "microDotBuilder/ask-ai";
 
 export const SITE = {
+  // Domain-anchored brand used in <title>, og:site_name, and JSON-LD — what
+  // Google should treat as the searchable entity. Distinct from `name`, which
+  // is the visible product label shown in the nav, footer, and chat UI.
+  brand: "Askpane",
   name: "Ask AI",
   tagline: "Ask anything about the page you're viewing.",
   description:
-    "Ask AI is a Chrome side-panel assistant that reads the current webpage and answers questions about it. Bring your own OpenAI or OpenRouter key — no hosted backend, history stays on your machine.",
+    "Askpane (Ask AI) is a Chrome side-panel assistant that reads the current webpage and answers questions about it. Bring your own OpenAI or OpenRouter key — no hosted backend, history stays on your machine.",
   url: import.meta.env.PUBLIC_SITE_URL ?? "https://askpane.ca",
   repo,
   repoUrl: `https://github.com/${repo}`,

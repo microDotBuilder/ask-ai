@@ -1,4 +1,5 @@
-import type { ConversationRecord } from "@askai/core";
+import type { AskAiSettings, ConversationRecord } from "@askai/core";
+import { defaultSettings } from "@askai/core";
 import { describe, expect, it, vi } from "vitest";
 import {
   createRetentionPruningPlan,
@@ -6,7 +7,9 @@ import {
   estimateBrowserStorage,
   estimateStorageBytes,
   isPersistentStorageGranted,
+  mapSettingsToRetentionPolicy,
   requestPersistentStorage,
+  runRetentionPruning,
   summarizeStorage,
 } from "../src";
 
@@ -74,6 +77,59 @@ describe("retention pruning", () => {
       oldest: "count",
       middle: "storage",
     });
+  });
+
+  it("maps settings field names onto the retention policy explicitly", () => {
+    const settings: AskAiSettings = {
+      ...defaultSettings,
+      saveHistory: false,
+      retention: {
+        maxConversations: 5,
+        maxStorageBytes: 1_000,
+        maxAgeDays: 7,
+        prunePinned: true,
+      },
+    };
+
+    expect(mapSettingsToRetentionPolicy(settings)).toEqual({
+      historyEnabled: false,
+      maxConversationCount: 5,
+      maxStorageBytes: 1_000,
+      maxAgeDays: 7,
+      prunePinned: true,
+    });
+  });
+
+  it("aggregates message bytes before applying the storage cap", async () => {
+    const conversations: ConversationRecord[] = [
+      conversation("c1", "2026-06-01T00:00:00.000Z", { storageBytes: 100 }),
+      conversation("c2", "2026-06-02T00:00:00.000Z", { storageBytes: 100 }),
+    ];
+    const deleted: string[] = [];
+
+    const summary = await runRetentionPruning(
+      {
+        historyEnabled: true,
+        maxConversationCount: 10,
+        maxAgeDays: 365,
+        maxStorageBytes: 1_500,
+      },
+      {
+        listConversations: async () => conversations,
+        async aggregateConversationBytes(conversationId) {
+          // c1 has 2,000 bytes of messages on top of its 100-byte base record.
+          return conversationId === "c1" ? 2_000 : 200;
+        },
+        async deleteConversation(conversationId) {
+          deleted.push(conversationId);
+        },
+      },
+      new Date("2026-06-07T00:00:00.000Z"),
+    );
+
+    expect(summary.deletedConversations).toBe(1);
+    expect(deleted).toEqual(["c1"]);
+    expect(summary.reasonsByConversationId.c1).toBe("storage");
   });
 
   it("can include pinned conversations when pruning is configured to do so", () => {

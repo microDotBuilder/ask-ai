@@ -1,12 +1,12 @@
 import {
+  apiKeyEncryptionKeyStorageKey,
   type AskAiSettings,
   defaultSettings,
   encryptApiKey,
-  exportApiKeyEncryptionKey,
-  generateApiKeyEncryptionKey,
   getBundledModelCatalog,
+  getOrCreateApiKeyEncryptionKey,
   getVisibleModels,
-  importApiKeyEncryptionKey,
+  importApiKeyEncryptionKeyNonExtractable,
   type ModelInfo,
   type PendingQuickAction,
   type ProviderId,
@@ -17,9 +17,9 @@ import {
   removeEncryptedApiKey,
   resolveProviderRequestConfig,
   saveEncryptedApiKey,
-  writeApiKeyEncryptionKey,
   writeSettings,
 } from "@askai/core";
+import { createCryptoKeyStore, initializeDatabase } from "@askai/db";
 
 export type { PendingQuickAction } from "@askai/core";
 
@@ -90,15 +90,25 @@ export async function readApiKeyStatus(): Promise<ApiKeyStatus> {
 }
 
 async function getOrCreateEncryptionKey(): Promise<CryptoKey> {
-  const existing = await readApiKeyEncryptionKey(chrome.storage.local);
+  await initializeDatabase();
+  const store = createCryptoKeyStore();
 
-  if (existing) {
-    return importApiKeyEncryptionKey(existing);
+  // One-time migration: if a legacy raw-key copy lives in `chrome.storage.local`,
+  // re-import it as a non-extractable CryptoKey in IndexedDB and remove the
+  // legacy copy. Existing ciphertexts decrypt unchanged.
+  const legacy = await readApiKeyEncryptionKey(chrome.storage.local);
+  if (legacy) {
+    const migrated = await importApiKeyEncryptionKeyNonExtractable(legacy);
+    await store.put("askai.apiKey.encryptionKey", migrated);
+    await chrome.storage.local.remove(apiKeyEncryptionKeyStorageKey);
+    return migrated;
   }
 
-  const key = await generateApiKeyEncryptionKey();
-  await writeApiKeyEncryptionKey(chrome.storage.local, await exportApiKeyEncryptionKey(key));
-  return key;
+  return getOrCreateApiKeyEncryptionKey(store);
+}
+
+export async function getApiKeyEncryptionKey(): Promise<CryptoKey> {
+  return getOrCreateEncryptionKey();
 }
 
 export async function saveProviderApiKey(providerId: ProviderId, apiKey: string): Promise<void> {

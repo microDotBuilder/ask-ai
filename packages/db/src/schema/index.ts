@@ -9,7 +9,14 @@ import Dexie, { type EntityTable } from "dexie";
 
 export const databaseName = "ask-ai";
 
-export const schemaVersion = 1;
+export const schemaVersion = 2;
+
+export interface SecretRecord {
+  id: string;
+  key: CryptoKey;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export class AskAiDatabase extends Dexie {
   conversations!: EntityTable<ConversationRecord, "id">;
@@ -17,16 +24,24 @@ export class AskAiDatabase extends Dexie {
   tabSessions!: EntityTable<TabSessionRecord, "id">;
   contextSnapshots!: EntityTable<ContextSnapshot, "id">;
   contextMetrics!: EntityTable<ContextMetrics, "id">;
+  secrets!: EntityTable<SecretRecord, "id">;
 
   constructor(name = databaseName) {
     super(name);
 
-    this.version(schemaVersion).stores({
+    this.version(1).stores({
       conversations: "id, updatedAt, createdAt, lastMessageAt, status, pinned, sourceUrl",
       messages: "id, conversationId, createdAt, updatedAt, role",
       tabSessions: "id, tabId, windowId, url, active, conversationId, updatedAt",
       contextSnapshots: "id, tabSessionId, conversationId, url, createdAt",
       contextMetrics: "id, tabSessionId, conversationId, url, createdAt",
+    });
+
+    this.version(2).stores({
+      // Holds non-extractable CryptoKey objects for envelope-encrypting saved
+      // API keys. Stored in IndexedDB so the raw bytes never reach JS or
+      // `chrome.storage.local`.
+      secrets: "id, updatedAt",
     });
   }
 }
@@ -38,7 +53,8 @@ export type AskAiTableName =
   | "messages"
   | "tabSessions"
   | "contextSnapshots"
-  | "contextMetrics";
+  | "contextMetrics"
+  | "secrets";
 
 export async function initializeDatabase(database = db): Promise<AskAiDatabase> {
   await database.open();

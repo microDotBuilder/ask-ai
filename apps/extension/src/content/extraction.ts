@@ -31,6 +31,37 @@ function unavailableSensitiveResponse(signal: SensitivePageSignal): PageContextR
   };
 }
 
+const SENSITIVE_TEXT_SCAN_CAP = 16_000;
+
+const PAYMENT_AUTOCOMPLETE_PATTERN = /\bcc-(name|number|exp|csc|type|number-[a-z]+)\b/i;
+const PAYMENT_TEXT_PATTERN =
+  /\b(card|credit|debit|cc-number|cvc|cvv|expiration|expiry|billing|iban|sort code|routing)\b/i;
+const AUTH_URL_PATTERN =
+  /\/(sign[-_]?in|login|log[-_]?in|signin|signup|sign[-_]?up|register|account|auth|oauth|two[-_]?factor|2fa|mfa|reset[-_]?password|verify|recover|wallet|secure|banking)(\/|$|\?)/i;
+const PAYMENT_URL_PATTERN =
+  /\/(checkout|cart\/(pay|checkout)|payment|billing|invoices?|subscriptions?\/(billing|payment))(\/|$|\?)/i;
+
+const AUTH_HOST_PATTERNS = [
+  /(^|\.)accounts\.google\.com$/i,
+  /(^|\.)login\.microsoftonline\.com$/i,
+  /(^|\.)login\.live\.com$/i,
+  /(^|\.)signin\.aws\.amazon\.com$/i,
+  /(^|\.)appleid\.apple\.com$/i,
+  /(^|\.)id\.atlassian\.com$/i,
+  /(^|\.)okta\.com$/i,
+  /(^|\.)duosecurity\.com$/i,
+  /(^|\.)auth0\.com$/i,
+];
+
+const PAYMENT_HOST_PATTERNS = [
+  /(^|\.)checkout\.stripe\.com$/i,
+  /(^|\.)js\.stripe\.com$/i,
+  /(^|\.)pay\.google\.com$/i,
+  /(^|\.)paypal\.com$/i,
+  /(^|\.)braintreegateway\.com$/i,
+  /(^|\.)adyen\.com$/i,
+];
+
 function getLabelText(input: HTMLInputElement): string {
   const labels = Array.from(input.labels ?? []).map((label) => label.textContent ?? "");
   const ariaLabel = input.getAttribute("aria-label") ?? "";
@@ -41,21 +72,105 @@ function getLabelText(input: HTMLInputElement): string {
   return [labels.join(" "), ariaLabel, placeholder, name, id].join(" ").toLowerCase();
 }
 
-export function detectSensitivePage(): SensitivePageSignal | null {
-  if (document.querySelector('input[type="password"]')) {
+function* deepInputs(root: ParentNode): Iterable<HTMLInputElement> {
+  for (const input of Array.from(root.querySelectorAll("input"))) {
+    yield input;
+  }
+  for (const node of Array.from(root.querySelectorAll<HTMLElement>("*"))) {
+    if (node.shadowRoot) {
+      yield* deepInputs(node.shadowRoot);
+    }
+  }
+}
+
+function hasSensitiveIframe(): boolean {
+  const iframes = Array.from(document.querySelectorAll("iframe"));
+  for (const frame of iframes) {
+    const src = frame.getAttribute("src") ?? "";
+    if (!src) {
+      continue;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(src, window.location.href);
+    } catch {
+      continue;
+    }
+    if (
+      AUTH_HOST_PATTERNS.some((pattern) => pattern.test(parsed.hostname)) ||
+      PAYMENT_HOST_PATTERNS.some((pattern) => pattern.test(parsed.hostname))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function detectSensitivePageUrl(rawUrl: string): SensitivePageSignal | null {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+
+  if (AUTH_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname))) {
     return {
-      kind: "password-field",
-      reason: "This page contains password fields, so Ask AI will not read it.",
+      kind: "auth-account-indicator",
+      reason: "This is a recognized identity or login provider, so Ask AI will not read it.",
     };
   }
 
-  const paymentPattern = /\b(card|credit|debit|cc-number|cvc|cvv|expiration|expiry|billing)\b/i;
+  if (PAYMENT_HOST_PATTERNS.some((pattern) => pattern.test(url.hostname))) {
+    return {
+      kind: "payment-field",
+      reason: "This is a recognized payment provider, so Ask AI will not read it.",
+    };
+  }
 
-  for (const input of Array.from(document.querySelectorAll("input"))) {
+  const path = url.pathname;
+  if (PAYMENT_URL_PATTERN.test(path)) {
+    return {
+      kind: "payment-field",
+      reason:
+        "The URL looks like a checkout, billing, or payment page, so Ask AI will not read it.",
+    };
+  }
+  if (AUTH_URL_PATTERN.test(path)) {
+    return {
+      kind: "auth-account-indicator",
+      reason: "The URL looks like a sign-in or account page, so Ask AI will not read it.",
+    };
+  }
+
+  return null;
+}
+
+export function detectSensitivePage(): SensitivePageSignal | null {
+  const urlSignal = detectSensitivePageUrl(window.location.href);
+  if (urlSignal) {
+    return urlSignal;
+  }
+
+  for (const input of deepInputs(document)) {
+    if (input.type === "password") {
+      return {
+        kind: "password-field",
+        reason: "This page contains password fields, so Ask AI will not read it.",
+      };
+    }
+
     const autocomplete = input.getAttribute("autocomplete") ?? "";
-    const text = `${autocomplete} ${getLabelText(input)}`;
+    if (PAYMENT_AUTOCOMPLETE_PATTERN.test(autocomplete)) {
+      return {
+        kind: "payment-field",
+        reason:
+          "This page appears to contain payment or billing fields, so Ask AI will not read it.",
+      };
+    }
 
-    if (/\bcc-(name|number|exp|csc|type)\b/i.test(autocomplete) || paymentPattern.test(text)) {
+    const text = `${autocomplete} ${getLabelText(input)}`;
+    if (PAYMENT_TEXT_PATTERN.test(text)) {
       return {
         kind: "payment-field",
         reason:
@@ -64,8 +179,18 @@ export function detectSensitivePage(): SensitivePageSignal | null {
     }
   }
 
+  if (hasSensitiveIframe()) {
+    return {
+      kind: "payment-field",
+      reason:
+        "This page embeds a recognized payment or sign-in frame, so Ask AI will not read it.",
+    };
+  }
+
   const bodyText = document.body?.innerText ?? document.body?.textContent ?? "";
-  const pageText = [document.title, bodyText.slice(0, 5000)].join(" ").toLowerCase();
+  const pageText = [document.title, bodyText.slice(0, SENSITIVE_TEXT_SCAN_CAP)]
+    .join(" ")
+    .toLowerCase();
   const authAccountSignals = [
     /\bsign in\b/,
     /\blog in\b/,

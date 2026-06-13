@@ -32,8 +32,17 @@ export default defineConfig({
     version,
     ...(isAlpha ? { version_name: `${version}-alpha` } : {}),
     minimum_chrome_version: "116",
-    permissions: ["activeTab", "contextMenus", "sidePanel", "scripting", "storage"],
+    permissions: ["activeTab", "contextMenus", "sidePanel", "scripting", "storage", "alarms"],
     host_permissions: ["<all_urls>"],
+    content_security_policy: {
+      extension_pages: [
+        "script-src 'self' 'wasm-unsafe-eval'",
+        "object-src 'self'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "connect-src 'self' https://api.openai.com https://openrouter.ai",
+      ].join("; "),
+    },
     icons,
     action: {
       default_title: appName,
