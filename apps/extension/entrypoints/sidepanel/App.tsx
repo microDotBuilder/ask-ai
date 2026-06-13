@@ -3,15 +3,15 @@ import {
   messageTypes,
   type QuickActionRequestMessage,
   quickActionDefinitions,
+  walkActivePath,
 } from "@askai/core";
-import { ArrowDown, Info, Sparkles } from "lucide-react";
+import { ArrowDown, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addChromeMessageListener } from "../../src/chrome";
 import { modelsForSettings, type PendingQuickAction } from "../../src/product";
 import type { ContextSummary } from "../../src/types/types";
-import { StatusBadge } from "../../src/ui/components/statusBadge";
 import { HeaderActions } from "../../src/ui/headerAction";
-import { HeaderStatus } from "../../src/ui/headerstatus";
+import { HistoryDrawer } from "../../src/ui/historyDrawer";
 import { InputContainer } from "../../src/ui/inputForm";
 import { MessageBubble } from "../../src/ui/messageBubble";
 import { SetupPanel } from "../../src/ui/setUpPannel";
@@ -24,12 +24,12 @@ export function App() {
   const settings = useSidepanelStore((state) => state.settings);
   const apiKeyStatus = useSidepanelStore((state) => state.apiKeyStatus);
   const messages = useSidepanelStore((state) => state.messages);
+  const conversation = useSidepanelStore((state) => state.conversation);
   const draft = useSidepanelStore((state) => state.draft);
   const error = useSidepanelStore((state) => state.error);
   const isStreaming = useSidepanelStore((state) => state.isStreaming);
   const pendingAction = useSidepanelStore((state) => state.pendingAction);
   const focusText = useSidepanelStore((state) => state.focusText);
-  const hintsSeen = useSidepanelStore((state) => state.hintsSeen);
   const setDraft = useSidepanelStore((state) => state.setDraft);
   const refreshProductState = useSidepanelStore((state) => state.refreshProductState);
   const requestContext = useSidepanelStore((state) => state.requestContext);
@@ -46,7 +46,6 @@ export function App() {
 
   const setupRequired =
     settings !== null && apiKeyStatus !== null && !apiKeyStatus[settings.defaultProviderId];
-  const showFirstRunHints = !hintsSeen;
 
   useEffect(() => {
     void refreshProductState();
@@ -118,6 +117,13 @@ export function App() {
     }
   }, [messages]);
 
+  const activePathResult = useMemo(
+    () => walkActivePath(conversation ?? undefined, messages),
+    [conversation, messages],
+  );
+  const visibleMessages = activePathResult.path;
+  const siblingsMap = activePathResult.siblings;
+
   const contextSummary = useMemo<ContextSummary | null>(() => {
     if (contextState.status !== "available") {
       return null;
@@ -137,6 +143,34 @@ export function App() {
       truncated: context.truncated,
     };
   }, [contextState]);
+
+  const statusLabel = {
+    available: "Context ready",
+    loading: "Reading the active tab",
+    blocked: "Context blocked",
+    failed: "Context unavailable",
+    unsupported: "Unsupported page",
+  }[contextState.status];
+
+  const headerDisplay = useMemo(() => {
+    if (contextState.status === "available") {
+      return {
+        title: contextSummary?.title ?? "Ask AI",
+        subline: isStreaming ? "Writing response…" : (contextSummary?.domain ?? ""),
+        warning: false,
+      };
+    }
+
+    if (contextState.status === "loading") {
+      return { title: "Reading the active tab…", subline: "", warning: false };
+    }
+
+    return {
+      title: "Ask AI",
+      subline: contextState.response.unavailable.message,
+      warning: true,
+    };
+  }, [contextState, contextSummary, isStreaming]);
 
   const visibleModels = settings ? modelsForSettings(settings) : [];
   const selectedModel = visibleModels.find(
@@ -160,33 +194,28 @@ export function App() {
     <main className="sidepanel-shell">
       <header className="app-header">
         <div className="app-title">
-          <h1>Ask AI</h1>
-          <HeaderStatus state={contextState} isStreaming={isStreaming} />
+          <span className="context-dot" data-state={contextState.status} title={statusLabel} />
+          <div className="app-title-copy">
+            <h1 title={headerDisplay.title}>{headerDisplay.title}</h1>
+            {headerDisplay.subline ? (
+              <p
+                className={
+                  headerDisplay.warning ? "status-copy status-copy-warning" : "status-copy"
+                }
+              >
+                {headerDisplay.subline}
+              </p>
+            ) : null}
+          </div>
         </div>
         <HeaderActions
-          contextSummary={contextSummary}
           contextState={contextState}
           disabledNewChat={isStreaming}
+          disabledRefresh={isStreaming}
           onNewChat={() => void startFreshChat()}
           onRefresh={() => void requestContext()}
         />
       </header>
-
-      {showFirstRunHints ? (
-        <div className="context-strip">
-          <div className="context-copy">
-            <span>Current tab</span>
-            <strong>{contextSummary?.title ?? "Waiting for page context"}</strong>
-            {contextSummary ? (
-              <small>
-                {contextSummary.domain} / {contextSummary.characterCount} characters /{" "}
-                {contextSummary.blocks}
-              </small>
-            ) : null}
-          </div>
-          <StatusBadge state={contextState} />
-        </div>
-      ) : null}
 
       {focusText ? (
         <p className="selection-preview">
@@ -199,17 +228,10 @@ export function App() {
         <p className="context-note">Long page context was truncated.</p>
       ) : null}
 
-      {contextState.status !== "loading" && contextState.status !== "available" ? (
-        <div className="context-unavailable">
-          <Info size={16} aria-hidden="true" />
-          <p>{contextState.response.unavailable.message}</p>
-        </div>
-      ) : null}
-
       <section className="chat-area">
         <div className="chat-scroll" onScroll={handleChatScroll} ref={scrollRef}>
           <div aria-live="polite" className="chat-stream">
-            {messages.length === 0 ? (
+            {visibleMessages.length === 0 ? (
               <div className="welcome-state">
                 <div className="welcome-icon">
                   <Sparkles size={18} aria-hidden="true" />
@@ -221,8 +243,12 @@ export function App() {
               </div>
             ) : null}
 
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+            {visibleMessages.map((message) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                siblingInfo={siblingsMap.get(message.id)}
+              />
             ))}
           </div>
 
@@ -238,7 +264,7 @@ export function App() {
               </button>
             ) : null}
 
-            {messages.length === 0 ? (
+            {visibleMessages.length === 0 ? (
               <div className="quick-actions">
                 {quickActionDefinitions.map((action) => (
                   <button
@@ -262,7 +288,7 @@ export function App() {
               contextState={contextState}
               draft={draft}
               focusText={focusText}
-              hasMessages={messages.length > 0}
+              hasMessages={visibleMessages.length > 0}
               isStreaming={isStreaming}
               onAbort={stopStreaming}
               onDraftChange={setDraft}
@@ -275,6 +301,8 @@ export function App() {
           </div>
         </div>
       </section>
+
+      <HistoryDrawer currentDomain={contextSummary?.domain} />
     </main>
   );
 }

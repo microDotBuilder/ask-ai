@@ -26,6 +26,7 @@ export const ConversationRecordSchema = Schema.Struct({
   sourceUrl: Schema.optional(UrlStringSchema),
   lastMessageAt: Schema.optional(ISODateStringSchema),
   storageBytes: NonNegativeIntegerSchema,
+  activeChildId: Schema.optional(Schema.String),
   createdAt: ISODateStringSchema,
   updatedAt: ISODateStringSchema,
 });
@@ -39,6 +40,7 @@ export interface ConversationRecord extends TimestampedRecord {
   sourceUrl?: UrlString;
   lastMessageAt?: ISODateString;
   storageBytes: number;
+  activeChildId?: string;
 }
 
 export const ChatMessageRecordSchema = Schema.Struct({
@@ -56,6 +58,11 @@ export const ChatMessageRecordSchema = Schema.Struct({
     }),
   ),
   finishReason: Schema.optional(Schema.String),
+  parentMessageId: Schema.optional(Schema.String),
+  activeChildId: Schema.optional(Schema.String),
+  providerId: Schema.optional(ProviderIdSchema),
+  modelId: Schema.optional(InternalModelIdSchema),
+  editedAt: Schema.optional(ISODateStringSchema),
   createdAt: ISODateStringSchema,
   updatedAt: ISODateStringSchema,
 });
@@ -72,6 +79,11 @@ export interface ChatMessageRecord extends TimestampedRecord {
     code?: string;
   };
   finishReason?: string;
+  parentMessageId?: string;
+  activeChildId?: string;
+  providerId?: ProviderId;
+  modelId?: InternalModelId;
+  editedAt?: ISODateString;
 }
 
 export const TabSessionRecordSchema = Schema.Struct({
@@ -108,3 +120,6 @@ export function parseChatMessageRecord(value: unknown): ChatMessageRecord {
 export function parseTabSessionRecord(value: unknown): TabSessionRecord {
   return Schema.decodeUnknownSync(TabSessionRecordSchema)(value);
 }
+
+export { walkActivePath } from "./walk";
+export type { ActivePathResult, SiblingInfo } from "./walk";
