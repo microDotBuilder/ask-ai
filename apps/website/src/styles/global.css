@@ -1,0 +1,70 @@
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind base;
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind components;
+/* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #121212;
+  color: #f4f7fb;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Subtle page-top radial wash in the brand color. */
+.page-aura {
+  background:
+    radial-gradient(60rem 32rem at 50% -8rem, rgba(47, 111, 237, 0.16), transparent 70%),
+    radial-gradient(40rem 24rem at 85% 0, rgba(47, 111, 237, 0.08), transparent 70%);
+}
+
+@layer utilities {
+  .text-gradient {
+    background: linear-gradient(180deg, #ffffff 0%, #b9c2d0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Visible keyboard focus for all interactive controls on the dark palette. */
+:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 2px;
+}
+
+/* Keep the gradient heading legible when the OS strips backgrounds
+   (Windows High Contrast / forced-colors), where clipped text would vanish. */
+@media (forced-colors: active) {
+  .text-gradient {
+    -webkit-text-fill-color: currentColor;
+    color: CanvasText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* Neutralize motion — Tailwind's animate-ping does not self-disable.
+     !important is required to outrank utility-class animation declarations. */
+  *,
+  *::before,
+  *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override utility animations. */
+    animation-duration: 0.01ms !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override utility animations. */
+    animation-iteration-count: 1 !important;
+    /* biome-ignore lint/complexity/noImportantStyles: reduced-motion reset must override utility animations. */
+    transition-duration: 0.01ms !important;
+  }
+}

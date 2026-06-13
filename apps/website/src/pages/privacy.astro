@@ -1,0 +1,60 @@
+---
+import Base from "../layouts/Base.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { SITE } from "../lib/site";
+
+// Required for the Chrome Web Store listing (a privacy-policy URL is mandatory).
+// Content mirrors the extension README's Privacy Model.
+const sections = [
+  {
+    h: "Bring-your-own-key",
+    p: "Ask AI has no hosted backend. You supply your own OpenAI or OpenRouter API key, and requests go directly from your browser to the provider you choose.",
+  },
+  {
+    h: "Where your data lives",
+    p: "Your API keys are stored locally in the browser's extension storage. Chat history is saved locally on your device when history is enabled, with a configurable retention limit.",
+  },
+  {
+    h: "When page content is sent",
+    p: "Page content is sent to your selected AI provider only when you ask a question or run a quick action. Nothing is transmitted in the background.",
+  },
+  {
+    h: "Your controls",
+    p: "You can disable history entirely, exclude specific sites from page context and history, and choose which providers and models are used.",
+  },
+  {
+    h: "What we collect",
+    p: "Ask AI does not run analytics servers and does not collect or sell your data. The only network requests are the AI calls you initiate, sent to the provider whose key you configured.",
+  },
+];
+---
+
+<Base title="Privacy" path="/privacy" description="How Ask AI handles your keys, chat history, and page content.">
+  <Nav />
+  <main class="mx-auto max-w-3xl px-5 py-16 sm:px-8 sm:py-24">
+    <a href="/" class="text-sm text-ink-muted transition-colors hover:text-ink">← Back to home</a>
+    <h1 class="mt-6 text-4xl font-semibold tracking-tight">Privacy</h1>
+    <p class="mt-4 text-ink-muted">
+      Ask AI is local-first and bring-your-own-key. In short: your keys and history stay on your device, and your
+      page content is only ever sent to the AI provider you choose, only when you ask.
+    </p>
+
+    <div class="mt-10 space-y-8">
+      {
+        sections.map((s) => (
+          <section>
+            <h2 class="text-xl font-medium">{s.h}</h2>
+            <p class="mt-2 leading-relaxed text-ink-muted">{s.p}</p>
+          </section>
+        ))
+      }
+    </div>
+
+    <div class="mt-12 rounded-2xl border border-line bg-panel/50 p-6 text-sm text-ink-muted">
+      Questions about privacy? Open an issue on
+      <a href={SITE.repoUrl} target="_blank" rel="noopener" class="text-ink underline-offset-2 hover:underline">GitHub</a>.
+    </div>
+  </main>
+  <Footer />
+</Base>

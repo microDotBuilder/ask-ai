@@ -1,0 +1,24 @@
+---
+import { SITE } from "../lib/site";
+---
+
+<footer class="border-t border-line">
+  <div class="mx-auto flex max-w-content flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+    <div class="flex items-center gap-2.5">
+      <img src="/brand-logo.png" width="24" height="24" alt="" class="rounded-md" />
+      <span class="text-sm font-medium">{SITE.name}</span>
+      <span class="text-sm text-ink-faint">— {SITE.tagline}</span>
+    </div>
+    <nav class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
+      <a href="#features" class="transition-colors hover:text-ink">Features</a>
+      <a href="#download" class="transition-colors hover:text-ink">Download</a>
+      <a href="/privacy" class="transition-colors hover:text-ink">Privacy</a>
+      <a href={SITE.repoUrl} target="_blank" rel="noopener" class="transition-colors hover:text-ink">GitHub</a>
+    </nav>
+  </div>
+  <div class="border-t border-line-soft">
+    <p class="mx-auto max-w-content px-5 py-5 text-xs text-ink-faint sm:px-8">
+      © {new Date().getFullYear()} {SITE.name}. Bring-your-own-key · No hosted backend · Open source.
+    </p>
+  </div>
+</footer>
