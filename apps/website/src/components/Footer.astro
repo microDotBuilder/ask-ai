@@ -2,23 +2,27 @@
 import { SITE } from "../lib/site";
 ---
 
-<footer class="border-t border-line">
-  <div class="mx-auto flex max-w-content flex-col gap-6 px-5 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-    <div class="flex items-center gap-2.5">
-      <img src="/brand-logo.png" width="24" height="24" alt="" class="rounded-md" />
-      <span class="text-sm font-medium">{SITE.name}</span>
-      <span class="text-sm text-ink-faint">— {SITE.tagline}</span>
+<footer class="mt-5 border-t border-line">
+  <div class="mx-auto max-w-content px-6">
+    <div class="flex flex-wrap items-center justify-between gap-5 py-9">
+      <div class="flex items-center gap-[11px] text-sm text-ink-muted">
+        <a href="#top" class="flex items-center gap-2.5 font-display font-semibold text-ink">
+          <span class="grid h-[30px] w-[30px] place-items-center rounded-[9px] border border-line-strong bg-panel-strong font-display text-[15px] font-bold tracking-tight text-accent-bright">A</span>
+          <span>{SITE.brand}</span>
+        </a>
+        <span class="hidden sm:inline">— {SITE.tagline}</span>
+      </div>
+      <nav class="flex flex-wrap gap-x-[26px] gap-y-2 text-sm text-ink-muted">
+        <a href="#features" class="transition-colors hover:text-ink">Features</a>
+        <a href="#download" class="transition-colors hover:text-ink">Download</a>
+        <a href="/privacy" class="transition-colors hover:text-ink">Privacy</a>
+        <a href={SITE.repoUrl} target="_blank" rel="noopener" class="transition-colors hover:text-ink">GitHub</a>
+      </nav>
     </div>
-    <nav class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
-      <a href="#features" class="transition-colors hover:text-ink">Features</a>
-      <a href="#download" class="transition-colors hover:text-ink">Download</a>
-      <a href="/privacy" class="transition-colors hover:text-ink">Privacy</a>
-      <a href={SITE.repoUrl} target="_blank" rel="noopener" class="transition-colors hover:text-ink">GitHub</a>
-    </nav>
   </div>
   <div class="border-t border-line-soft">
-    <p class="mx-auto max-w-content px-5 py-5 text-xs text-ink-faint sm:px-8">
-      © {new Date().getFullYear()} {SITE.name}. Bring-your-own-key · No hosted backend · Open source.
+    <p class="mx-auto max-w-content px-6 py-[18px] font-mono text-[11.5px] text-ink-faint">
+      © {new Date().getFullYear()} {SITE.brand}. Bring-your-own-key · No hosted backend · Open source.
     </p>
   </div>
 </footer>

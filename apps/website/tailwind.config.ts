@@ -1,48 +1,56 @@
 import type { Config } from "tailwindcss";
 
-// Brand palette mirrors the extension side panel (apps/extension side panel CSS)
-// so the marketing site and the product share one dark visual language.
+// Palette mirrors the new-redesign.html visual language: very dark backgrounds,
+// grayscale ink, white accent. No blue brand color anymore.
 export default {
   content: ["./src/**/*.{astro,html,ts,tsx,md,mdx}"],
   theme: {
     extend: {
       colors: {
-        bg: "#121212",
+        bg: "#050608",
+        "bg-2": "#080a0d",
         panel: {
-          DEFAULT: "#1b1b1b",
-          strong: "#202020",
-          hover: "#282828",
+          DEFAULT: "#0e1014",
+          strong: "#15181e",
+          deep: "#1d2027",
+          // Kept for legacy class names; resolves to the new strong panel.
+          hover: "#15181e",
         },
         line: {
-          DEFAULT: "#2d2d2d",
-          soft: "#242424",
+          DEFAULT: "rgba(255,255,255,0.07)",
+          soft: "rgba(255,255,255,0.04)",
+          strong: "rgba(255,255,255,0.16)",
         },
         ink: {
-          DEFAULT: "#f4f7fb",
-          muted: "#9aa1ad",
-          // ≥4.5:1 on #121212 (was #707070 at 3.78:1, failing WCAG AA).
-          faint: "#8b919c",
+          DEFAULT: "#eceef4",
+          muted: "#9aa1b0",
+          faint: "#646c7c",
         },
-        brand: {
-          DEFAULT: "#2f6fed",
-          soft: "#274f9f",
+        accent: {
+          DEFAULT: "#e0e3eb",
+          bright: "#ffffff",
+          deep: "#9aa1b0",
         },
-        ok: "#1f7a59",
-        warn: "#ffd58a",
+        ok: "#56d8a6",
+        warn: "#e7b15a",
       },
       fontFamily: {
         sans: [
-          '"Inter Variable"',
-          "Inter",
+          '"Hanken Grotesk"',
           "-apple-system",
           "BlinkMacSystemFont",
           '"Segoe UI"',
           "system-ui",
           "sans-serif",
         ],
+        display: [
+          "Geist",
+          '"Space Grotesk"',
+          "system-ui",
+          "sans-serif",
+        ],
         mono: [
-          '"Roboto Mono Variable"',
-          '"Roboto Mono"',
+          '"Geist Mono"',
           "ui-monospace",
           "SFMono-Regular",
           "Menlo",
@@ -50,10 +58,12 @@ export default {
         ],
       },
       maxWidth: {
-        content: "72rem",
+        content: "1180px",
       },
       boxShadow: {
-        glow: "0 0 0 1px rgba(47,111,237,0.35), 0 18px 60px -20px rgba(47,111,237,0.55)",
+        shot: "0 40px 90px -40px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.02)",
+        float:
+          "0 36px 60px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) inset",
       },
     },
   },

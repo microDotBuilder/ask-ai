@@ -1,6 +1,6 @@
 ---
-import "@fontsource-variable/inter";
-import "@fontsource-variable/roboto-mono";
+// Fonts (Geist, Geist Mono, Hanken Grotesk) are loaded via Google Fonts from
+// global.css. Preconnect hints below cut request latency.
 import "../styles/global.css";
 import { SITE } from "../lib/site";
 
@@ -60,7 +60,9 @@ const softwareSchema = {
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icon-128.png" />
-    <meta name="theme-color" content="#121212" />
+    <meta name="theme-color" content="#0a0b0e" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE.brand} />
@@ -81,6 +83,9 @@ const softwareSchema = {
     )}
   </head>
   <body class="min-h-screen font-sans antialiased">
-    <slot />
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="relative z-[1]">
+      <slot />
+    </div>
   </body>
 </html>

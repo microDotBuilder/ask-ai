@@ -2,32 +2,25 @@
 import { SITE } from "../lib/site";
 ---
 
-<header class="sticky top-0 z-30 border-b border-line/70 bg-bg/80 backdrop-blur">
-  <nav class="mx-auto flex max-w-content items-center justify-between gap-4 px-5 py-3.5 sm:px-8">
-    <a href="/" class="flex items-center gap-2.5 font-semibold tracking-tight">
-      <img src="/brand-logo.png" width="28" height="28" alt="" class="rounded-md" />
-      <span>{SITE.name}</span>
+<header class="sticky top-0 z-50 border-b border-line-soft bg-[rgba(10,11,14,0.72)] backdrop-blur-xl">
+  <nav class="mx-auto flex h-[62px] max-w-content items-center justify-between gap-4 px-6">
+    <a href="#top" class="flex items-center gap-2.5 font-display font-semibold tracking-tight">
+      <span class="grid h-[30px] w-[30px] place-items-center rounded-[9px] border border-line-strong bg-panel-strong font-display text-[15px] font-bold tracking-tight text-accent-bright">A</span>
+      <span>{SITE.brand}</span>
     </a>
 
-    <div class="hidden items-center gap-7 text-sm text-ink-muted md:flex">
-      <a href="#features" class="transition-colors hover:text-ink">Features</a>
-      <a href="#providers" class="transition-colors hover:text-ink">Providers</a>
-      <a href="#download" class="transition-colors hover:text-ink">Download</a>
-      <a href="/privacy" class="transition-colors hover:text-ink">Privacy</a>
-    </div>
-
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-[18px]">
       <a
         href={SITE.repoUrl}
         target="_blank"
         rel="noopener"
-        class="hidden text-sm text-ink-muted transition-colors hover:text-ink sm:inline"
+        class="hidden text-[14.5px] text-ink-muted transition-colors hover:text-ink sm:inline"
         >GitHub</a
       >
       <a
         href="#download"
-        class="rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white shadow-glow transition-transform hover:-translate-y-px"
-        >Get Ask AI</a
+        class="inline-flex items-center justify-center gap-2 rounded-[11px] bg-white px-4 py-[9px] text-sm font-semibold text-[#0a0b0e] transition-transform hover:-translate-y-px hover:bg-[#e9eaee]"
+        >Download</a
       >
     </div>
   </nav>

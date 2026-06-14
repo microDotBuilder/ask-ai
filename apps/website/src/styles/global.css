@@ -1,3 +1,6 @@
+/* Fonts come from Google Fonts. Preconnect hints live in Base.astro. */
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600&display=swap");
+
 /* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
 @tailwind base;
 /* biome-ignore lint/suspicious/noUnknownAtRules: Tailwind processes these directives. */
@@ -14,49 +17,125 @@ html {
 }
 
 body {
-  background-color: #121212;
-  color: #f4f7fb;
+  background-color: #050608;
+  color: #eceef4;
+  font-family: "Hanken Grotesk", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-/* Subtle page-top radial wash in the brand color. */
-.page-aura {
-  background:
-    radial-gradient(60rem 32rem at 50% -8rem, rgba(47, 111, 237, 0.16), transparent 70%),
-    radial-gradient(40rem 24rem at 85% 0, rgba(47, 111, 237, 0.08), transparent 70%);
+::selection {
+  background: rgba(124, 135, 255, 0.32);
+  color: #fff;
 }
 
-@layer utilities {
-  .text-gradient {
-    background: linear-gradient(180deg, #ffffff 0%, #b9c2d0 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+/* Fixed grid background that washes the entire page. */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+/* Soft glow under the hero product mockup. */
+.shot-glow::after {
+  content: "";
+  position: absolute;
+  inset: auto 8% -40px 8%;
+  height: 90px;
+  background: radial-gradient(50% 100% at 50% 0, rgba(255, 255, 255, 0.05), transparent 70%);
+  filter: blur(10px);
+  z-index: -1;
+}
+
+/* Floating provider tiles in the hero. */
+.float-tile {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #1a1d24, #0e1014);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 36px 60px -20px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+}
+.float-tile img {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+}
+.float-tile.a {
+  top: 96px;
+  left: 2%;
+  animation: floaty-a 4.2s ease-in-out infinite;
+}
+.float-tile.b {
+  top: 78px;
+  right: 2%;
+  animation: floaty-b 4.2s ease-in-out 0.8s infinite;
+}
+.float-tile.c {
+  top: 470px;
+  right: 3%;
+  animation: floaty-c 4.2s ease-in-out 1.4s infinite;
+}
+@keyframes floaty-a {
+  0%, 100% { transform: rotate(-11deg) translateY(0); }
+  50%      { transform: rotate(-11deg) translateY(-20px); }
+}
+@keyframes floaty-b {
+  0%, 100% { transform: rotate(9deg) translateY(0); }
+  50%      { transform: rotate(9deg) translateY(-20px); }
+}
+@keyframes floaty-c {
+  0%, 100% { transform: rotate(-6deg) translateY(0); }
+  50%      { transform: rotate(-6deg) translateY(-20px); }
+}
+@media (max-width: 760px) {
+  .float-tile { display: none; }
+}
+
+/* Pulsing "coming soon" indicator. */
+.ping-dot {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  display: inline-block;
+}
+.ping-dot::before,
+.ping-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #e0e3eb;
+}
+.ping-dot::before {
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2.4);
+    opacity: 0;
   }
 }
 
-/* Visible keyboard focus for all interactive controls on the dark palette. */
+/* Visible keyboard focus on the dark palette. */
 :focus-visible {
-  outline: 2px solid #2f6fed;
+  outline: 2px solid #e0e3eb;
   outline-offset: 2px;
 }
 
-/* Keep the gradient heading legible when the OS strips backgrounds
-   (Windows High Contrast / forced-colors), where clipped text would vanish. */
-@media (forced-colors: active) {
-  .text-gradient {
-    -webkit-text-fill-color: currentColor;
-    color: CanvasText;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-  /* Neutralize motion — Tailwind's animate-ping does not self-disable.
-     !important is required to outrank utility-class animation declarations. */
+  html { scroll-behavior: auto; }
   *,
   *::before,
   *::after {

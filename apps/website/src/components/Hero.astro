@@ -1,84 +1,143 @@
 ---
-import ChromeButton from "./ChromeButton.astro";
-import { SITE } from "../lib/site";
+import { SITE, chromeStoreLive } from "../lib/site";
+
+// Hero CTA: when the Chrome Web Store listing is live, the primary button is a
+// live link. Until then it scrolls to the download section, where the
+// "Coming soon" card is rendered.
+const primaryHref = chromeStoreLive ? SITE.chromeStoreUrl : "#download";
+const primaryRel = chromeStoreLive ? "noopener" : undefined;
+const primaryTarget = chromeStoreLive ? "_blank" : undefined;
 ---
 
-<section class="page-aura relative overflow-hidden">
-  <div class="mx-auto max-w-content px-5 pb-16 pt-16 text-center sm:px-8 sm:pt-24">
-    <a
-      href={SITE.releasesUrl}
-      target="_blank"
-      rel="noopener"
-      class="inline-flex items-center gap-2 rounded-full border border-line bg-panel/60 px-3.5 py-1.5 text-xs text-ink-muted transition-colors hover:text-ink"
-    >
-      <span class="h-1.5 w-1.5 rounded-full bg-ok"></span>
-      Manifest V3 · Bring-your-own-key · Local-first
-    </a>
+<section class="hero relative pt-[120px] pb-[30px] text-center">
+  <div class="float-logos pointer-events-none absolute inset-0 z-[3]" aria-hidden="true">
+    <span class="float-tile a"><img src="/providers/openai.svg" alt="" /></span>
+    <span class="float-tile b"><img src="/providers/anthropic.svg" alt="" /></span>
+    <span class="float-tile c"><img src="/providers/gemenai.svg" alt="" /></span>
+  </div>
 
-    <h1 class="mx-auto mt-7 max-w-3xl text-balance text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
-      <span class="text-gradient">Askpane —</span><br class="hidden sm:block" />
-      <span class="text-gradient">ask anything about the page you're viewing.</span>
+  <div class="mx-auto max-w-content px-6">
+    <h1
+      class="mx-auto mt-[34px] max-w-[14ch] font-display text-[clamp(2.8rem,7.2vw,5.4rem)] font-semibold leading-[1.02] tracking-[-0.028em]"
+    >
+      Ask anything about <span class="text-ink">the page you're viewing.</span>
     </h1>
 
-    <p class="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-ink-muted sm:text-lg">
-      Ask AI lives in Chrome's side panel. It reads the current webpage and answers questions about it —
+    <p class="mx-auto mt-6 max-w-[60ch] text-[clamp(1rem,1.6vw,1.18rem)] text-ink-muted">
+      {SITE.brand} lives in Chrome's side panel. It reads the current webpage and answers questions about it —
       summarize, explain, rewrite, translate, or dig into code, with the page context added automatically.
     </p>
 
-    <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-      <ChromeButton size="lg" />
+    <div class="mt-[34px] flex flex-wrap justify-center gap-[14px]">
       <a
-        href="#download"
-        class="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-panel px-6 py-3.5 text-base font-medium text-ink transition-colors hover:bg-panel-hover"
+        href={primaryHref}
+        target={primaryTarget}
+        rel={primaryRel}
+        class="inline-flex items-center justify-center gap-2.5 rounded-[13px] border border-line bg-panel px-6 py-[14px] text-[15.5px] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-panel-strong"
       >
-        Download builds
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.4" />
+          <path d="M12 2a10 10 0 0 1 8.66 5h-9.83a5 5 0 0 0-4.7 3.27L1.84 5.4A10 10 0 0 1 12 2Zm0 20a10 10 0 0 1-8.66-15l4.91 8.5A5 5 0 0 0 12 17a5 5 0 0 0 1.55-.24L9.61 21.84A10 10 0 0 1 12 22Zm10-10a10 10 0 0 1-5.85 9.1l4.92-8.53a5 5 0 0 0-.6-5.57h6.36A10 10 0 0 1 22 12Z" opacity=".7" />
+        </svg>
+        Add to Chrome
+      </a>
+      <a
+        href={SITE.repoUrl}
+        target="_blank"
+        rel="noopener"
+        class="inline-flex items-center justify-center gap-2.5 rounded-[13px] border border-line bg-panel px-6 py-[14px] text-[15.5px] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-panel-strong"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5A12 12 0 0 0 .5 12.5a12 12 0 0 0 8.2 11.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6a12 12 0 0 0 8.2-11.4A12 12 0 0 0 12 .5Z" />
+        </svg>
+        Star on GitHub
       </a>
     </div>
 
-    <p class="mt-4 text-xs text-ink-faint">
-      Free · Your OpenAI / OpenRouter key, your data · No hosted backend
+    <p class="mt-[18px] font-mono text-[12.5px] text-ink-faint">
+      Free · Coming to Chrome Web Store · Your keys, your data
     </p>
 
-    <!-- Product preview -->
-    <div class="mx-auto mt-14 max-w-4xl">
-      <div class="relative rounded-2xl border border-line bg-panel-strong p-2 shadow-glow">
-        <div class="flex items-center justify-between rounded-t-xl bg-panel px-4 py-2.5">
-          <div class="flex gap-1.5">
-            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-line"></span>
+    <!-- PRODUCT MOCKUP -->
+    <div class="shot shot-glow relative mx-auto mt-[60px] max-w-[980px]">
+      <div class="overflow-hidden rounded-2xl border border-line bg-panel shadow-shot">
+        <!-- Browser chrome -->
+        <div class="flex items-center gap-[14px] border-b border-line-soft bg-panel-strong px-4 py-[11px]">
+          <div class="flex gap-[7px]">
+            <span class="h-[11px] w-[11px] rounded-full bg-[#33373f]"></span>
+            <span class="h-[11px] w-[11px] rounded-full bg-[#33373f]"></span>
+            <span class="h-[11px] w-[11px] rounded-full bg-[#33373f]"></span>
           </div>
-          <span class="font-mono text-[11px] text-ink-faint">chrome · side panel</span>
-          <span class="w-12"></span>
+          <div class="mx-auto flex h-7 max-w-[380px] flex-1 items-center gap-2 rounded-lg border border-line-soft bg-bg px-3 font-mono text-[11.5px] text-ink-faint">
+            <span class="text-ok">●</span>
+            <span>docs.example.com/guide/streaming</span>
+          </div>
+          <div class="w-[54px]"></div>
         </div>
-        <div class="grid gap-3 rounded-b-xl bg-bg p-4 text-left sm:grid-cols-[1fr_minmax(0,18rem)]">
-          <div class="hidden flex-col gap-2 rounded-lg border border-line-soft bg-panel/40 p-4 sm:flex">
-            <div class="h-2.5 w-2/3 rounded bg-line"></div>
-            <div class="h-2.5 w-full rounded bg-line-soft"></div>
-            <div class="h-2.5 w-11/12 rounded bg-line-soft"></div>
-            <div class="h-2.5 w-4/5 rounded bg-line-soft"></div>
-            <div class="mt-2 h-2.5 w-1/2 rounded bg-line"></div>
-            <div class="h-2.5 w-full rounded bg-line-soft"></div>
-            <div class="h-2.5 w-10/12 rounded bg-line-soft"></div>
+
+        <!-- Body: fake article + side panel -->
+        <div class="grid min-h-[430px] bg-[#080a0d] sm:grid-cols-[1fr_340px]">
+          <!-- Fake article -->
+          <div class="hidden overflow-hidden border-r border-line-soft px-[34px] py-[30px] text-left sm:block">
+            <div class="font-mono text-[10.5px] uppercase tracking-[0.08em] text-accent">Documentation</div>
+            <h4 class="mt-3 max-w-[22ch] font-display text-[23px] font-semibold leading-[1.2] text-[#dfe2ea]">
+              Streaming responses with server-sent events
+            </h4>
+            <div class="mt-[18px] flex flex-col gap-[11px]">
+              <div class="h-[9px] rounded-[5px] bg-panel-deep" style="width:96%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:100%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:88%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:93%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:70%"></div>
+            </div>
+            <div class="mt-6 h-[11px] w-[42%] rounded-[5px] bg-panel-deep"></div>
+            <div class="mt-4 flex flex-col gap-[11px]">
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:100%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:84%"></div>
+              <div class="h-[9px] rounded-[5px] bg-panel-strong" style="width:91%"></div>
+            </div>
           </div>
-          <div class="flex flex-col gap-3 rounded-lg border border-line bg-panel p-4">
-            <div class="flex items-center gap-2">
-              <img src="/brand-logo.png" width="22" height="22" alt="" class="rounded" />
-              <span class="text-sm font-medium">Ask AI</span>
+
+          <!-- Side panel -->
+          <div class="flex flex-col border-l border-line bg-panel text-left">
+            <div class="flex items-center gap-[9px] border-b border-line-soft px-4 py-[13px]">
+              <span class="grid h-[22px] w-[22px] place-items-center rounded-md border border-line-strong bg-panel-strong font-display text-[12px] font-bold text-accent-bright">A</span>
+              <span class="font-display text-sm font-semibold">{SITE.brand}</span>
+              <span class="ml-auto flex items-center gap-[5px] rounded-md border border-line-soft px-[7px] py-[3px] font-mono text-[10px] text-ink-faint">
+                <span class="h-[5px] w-[5px] rounded-full bg-ok"></span>
+                page in context
+              </span>
             </div>
-            <div class="ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-brand px-3.5 py-2 text-sm text-white">
-              Summarize this article in 3 bullets.
-            </div>
-            <div class="max-w-[88%] rounded-2xl rounded-bl-sm bg-panel-strong px-3.5 py-2 text-sm text-ink">
-              <div class="space-y-1.5">
-                <div class="h-2 w-full rounded bg-line"></div>
-                <div class="h-2 w-11/12 rounded bg-line-soft"></div>
-                <div class="h-2 w-3/4 rounded bg-line-soft"></div>
+
+            <div class="flex flex-1 flex-col gap-[13px] overflow-hidden p-4">
+              <div class="max-w-[86%] self-end rounded-2xl rounded-br-[5px] bg-gradient-to-b from-accent to-accent-deep px-[13px] py-2.5 text-[13px] leading-[1.55] text-white">
+                Summarize this article in 3 bullets.
+              </div>
+              <div class="max-w-[86%] self-start rounded-2xl rounded-bl-[5px] border border-line-soft bg-panel-deep px-[13px] py-2.5 text-[13px] leading-[1.55] text-ink">
+                <b class="font-semibold text-white">Here's the gist:</b>
+                <ul class="mt-2 flex list-none flex-col gap-2">
+                  <li class="relative pl-4 text-ink-muted before:absolute before:left-[2px] before:top-[7px] before:h-[5px] before:w-[5px] before:rounded-full before:bg-accent-bright">
+                    SSE streams tokens over a single long-lived HTTP connection.
+                  </li>
+                  <li class="relative pl-4 text-ink-muted before:absolute before:left-[2px] before:top-[7px] before:h-[5px] before:w-[5px] before:rounded-full before:bg-accent-bright">
+                    The client reads an <span class="font-mono">EventSource</span> and appends as it arrives.
+                  </li>
+                  <li class="relative pl-4 text-ink-muted before:absolute before:left-[2px] before:top-[7px] before:h-[5px] before:w-[5px] before:rounded-full before:bg-accent-bright">
+                    Reconnect logic and backpressure are the main gotchas.
+                  </li>
+                </ul>
+              </div>
+              <div class="flex flex-wrap gap-[7px]">
+                <span class="rounded-lg border border-[rgba(124,135,255,0.35)] bg-[rgba(124,135,255,0.1)] px-[9px] py-[5px] font-mono text-[11px] text-accent-bright">Summarize</span>
+                <span class="rounded-lg border border-line bg-panel-strong px-[9px] py-[5px] font-mono text-[11px] text-ink-muted">Explain</span>
+                <span class="rounded-lg border border-line bg-panel-strong px-[9px] py-[5px] font-mono text-[11px] text-ink-muted">Rewrite</span>
+                <span class="rounded-lg border border-line bg-panel-strong px-[9px] py-[5px] font-mono text-[11px] text-ink-muted">Translate</span>
               </div>
             </div>
-            <div class="mt-1 flex items-center gap-2 rounded-xl border border-line-soft bg-bg px-3 py-2 text-xs text-ink-faint">
+
+            <div class="mx-4 mb-4 flex items-center gap-2 rounded-[11px] border border-line bg-bg px-[11px] py-[9px] text-[12.5px] text-ink-faint">
               <span>Ask about this page…</span>
-              <span class="ml-auto rounded-md bg-brand/20 px-2 py-1 font-mono text-[10px] text-[#a7c4ff]">⌘⇧A</span>
+              <span class="ml-auto rounded-md bg-[rgba(124,135,255,0.14)] px-[7px] py-[3px] font-mono text-[10px] text-accent-bright">⌘⇧A</span>
             </div>
           </div>
         </div>

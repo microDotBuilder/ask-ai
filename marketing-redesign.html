@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Askpane — The bring-your-own-key AI side panel for Chrome</title>
+<meta name="description" content="Askpane is a Chrome side-panel assistant that reads the page you're on and answers — summarize, explain, rewrite, translate, dig into code. Bring your own OpenAI, Claude, Gemini, or OpenRouter key. Local-first, no hosted backend.">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000;
+    --bg-soft:#070707;
+    --panel:#0f0f0f;
+    --panel-2:#141414;
+    --line:rgba(255,255,255,.08);
+    --line-soft:rgba(255,255,255,.05);
+    --ink:#f5f5f5;
+    --ink-muted:#8a8a8a;
+    --ink-faint:#5a5a5a;
+    --warm:#ff9d6b;
+    --warm-soft:rgba(255,157,107,.18);
+    --maxw:78rem;
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
+    --serif:"Instrument Serif",ui-serif,Georgia,serif;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+    position:relative;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(255,255,255,.18);color:#fff}
+  :focus-visible{outline:2px solid #fff;outline-offset:3px;border-radius:6px}
+
+  /* ============ grid background that sits behind everything ============ */
+  .grid-bg{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size:56px 56px;
+    background-position:center top;
+    mask-image:radial-gradient(ellipse 90% 60% at 50% 30%, #000 35%, transparent 95%);
+    -webkit-mask-image:radial-gradient(ellipse 90% 60% at 50% 30%, #000 35%, transparent 95%);
+  }
+  /* warm glow behind the hero */
+  .glow{
+    position:absolute;left:50%;top:-8rem;transform:translateX(-50%);
+    width:54rem;height:38rem;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 50% 40% at 50% 50%, rgba(255,157,107,.10), transparent 70%);
+    filter:blur(40px);
+  }
+
+  .wrap{max-width:var(--maxw);margin-inline:auto;padding-inline:24px;position:relative;z-index:2}
+  main,header,footer{position:relative;z-index:1}
+
+  /* ============ nav ============ */
+  header{position:absolute;top:0;left:0;right:0;z-index:30}
+  nav{display:flex;align-items:center;justify-content:space-between;height:72px;max-width:var(--maxw);margin-inline:auto;padding-inline:28px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:500;font-size:.98rem;letter-spacing:-.01em}
+  .brand .mark{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+    background:linear-gradient(140deg,#2a2a2a,#0d0d0d);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.06);
+    font-family:var(--serif);font-size:1.05rem;color:#fff;line-height:1}
+  .nav-right{display:flex;align-items:center;gap:10px}
+  .pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:38px;padding:0 16px;border-radius:999px;font-size:.88rem;font-weight:500;
+    transition:transform .18s ease, background .2s, border-color .2s, color .2s;cursor:pointer;white-space:nowrap}
+  .pill-ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line)}
+  .pill-ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.14)}
+  .pill-solid{background:#fff;color:#0a0a0a;border:1px solid #fff}
+  .pill-solid:hover{transform:translateY(-1px);background:#f0f0f0}
+
+  /* ============ HERO ============ */
+  .hero{position:relative;padding-top:9rem;padding-bottom:6rem;text-align:center;overflow:visible}
+  .hero-inner{position:relative;max-width:60rem;margin-inline:auto;padding-inline:24px}
+  .eyebrow{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);
+    font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);
+    border:1px solid var(--line);border-radius:999px;padding:6px 14px;background:rgba(255,255,255,.02)}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--warm);
+    box-shadow:0 0 10px var(--warm)}
+  h1.hero-title{font-family:var(--serif);font-weight:400;
+    font-size:clamp(2.8rem,6.4vw,5.6rem);line-height:1.04;letter-spacing:-.015em;
+    margin-top:30px;color:#fff}
+  h1.hero-title em{font-style:italic;color:#e6e6e6}
+  .hero-sub{margin:28px auto 0;color:var(--ink-muted);font-size:1.08rem;
+    max-width:34rem;line-height:1.55}
+  .hero-cta{display:inline-flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:36px}
+  .pill-lg{height:48px;padding:0 22px;font-size:.95rem}
+  .hero-fine{margin-top:22px;font-family:var(--mono);font-size:.74rem;color:var(--ink-faint);letter-spacing:.04em}
+  .hero-fine span{color:var(--ink-muted)}
+
+  /* ============ floating provider icons ============ */
+  .floaters{position:absolute;inset:0;pointer-events:none;z-index:1}
+  .floaters > * {pointer-events:auto}
+  .float-ic{position:absolute;width:84px;height:84px;border-radius:22px;
+    display:grid;place-items:center;
+    background:linear-gradient(155deg,#1c1c1c 0%,#0a0a0a 60%,#050505 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.10),
+      inset 0 0 0 1px rgba(255,255,255,.04),
+      0 30px 60px -20px rgba(0,0,0,.85),
+      0 0 0 1px rgba(0,0,0,.6);
+    transition:transform .5s cubic-bezier(.22,1,.36,1)}
+  .float-ic::before{content:"";position:absolute;inset:0;border-radius:inherit;
+    background:radial-gradient(120% 80% at 30% 0%, rgba(255,255,255,.12), transparent 55%);
+    pointer-events:none}
+  .float-ic:hover{transform:translateY(-4px) scale(1.04)}
+  .float-ic svg{width:42px;height:42px;display:block;position:relative;z-index:1}
+
+  /* per-icon glow */
+  .float-ic.openai::after{content:"";position:absolute;inset:-30%;border-radius:inherit;
+    background:radial-gradient(closest-side, rgba(255,255,255,.06), transparent 70%);z-index:0}
+  .float-ic.anthropic::after{content:"";position:absolute;inset:-30%;border-radius:inherit;
+    background:radial-gradient(closest-side, rgba(255,157,107,.10), transparent 70%);z-index:0}
+  .float-ic.gemini::after{content:"";position:absolute;inset:-30%;border-radius:inherit;
+    background:radial-gradient(closest-side, rgba(100,150,255,.08), transparent 70%);z-index:0}
+  .float-ic.openrouter::after{content:"";position:absolute;inset:-30%;border-radius:inherit;
+    background:radial-gradient(closest-side, rgba(180,140,255,.08), transparent 70%);z-index:0}
+
+  /* position the floaters at hero corners */
+  .float-ic.openai    { top:18%;  left:5%;   transform:rotate(-8deg)}
+  .float-ic.anthropic { top:14%;  right:5%;  transform:rotate(7deg)}
+  .float-ic.gemini    { top:62%;  left:7%;   transform:rotate(6deg)}
+  .float-ic.openrouter{ top:58%;  right:6%;  transform:rotate(-9deg)}
+
+  @media (prefers-reduced-motion:no-preference){
+    .float-ic{animation:floaty 7s ease-in-out infinite}
+    .float-ic.anthropic{animation-delay:-1.4s}
+    .float-ic.gemini{animation-delay:-3s}
+    .float-ic.openrouter{animation-delay:-4.6s}
+  }
+  @keyframes floaty{
+    0%,100%{translate:0 0}
+    50%{translate:0 -10px}
+  }
+
+  /* ============ hero entrance ============ */
+  @media (prefers-reduced-motion:no-preference){
+    .enter{opacity:0;animation:rise .8s cubic-bezier(.22,1,.36,1) forwards}
+    .d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.27s}
+    .d4{animation-delay:.39s}.d5{animation-delay:.51s}
+    .float-ic{opacity:0;animation:rise .8s cubic-bezier(.22,1,.36,1) .6s forwards, floaty 7s ease-in-out 1.4s infinite}
+    .float-ic.anthropic{animation-delay:.7s,2s}
+    .float-ic.gemini{animation-delay:.8s,3.4s}
+    .float-ic.openrouter{animation-delay:.9s,4.6s}
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  /* ============ app preview ============ */
+  .preview-wrap{position:relative;margin-top:5rem;padding-inline:24px}
+  .preview-inner{max-width:62rem;margin-inline:auto;position:relative}
+  .preview-inner::before{
+    content:"";position:absolute;left:50%;top:-2rem;transform:translateX(-50%);
+    width:80%;height:6rem;border-radius:50%;
+    background:radial-gradient(ellipse at center, rgba(255,157,107,.18), transparent 65%);
+    filter:blur(40px);pointer-events:none;z-index:-1}
+  .preview{position:relative;border-radius:18px;overflow:hidden;
+    background:linear-gradient(180deg,#161616,#0c0c0c);
+    border:1px solid var(--line);
+    box-shadow:
+      0 60px 120px -40px rgba(0,0,0,.9),
+      0 0 0 1px rgba(255,255,255,.03),
+      inset 0 1px 0 rgba(255,255,255,.06)}
+  .pv-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line-soft);
+    background:linear-gradient(180deg,#1a1a1a,#111)}
+  .tld{display:flex;gap:7px;margin-right:6px}
+  .tld span{width:11px;height:11px;border-radius:50%;background:#2a2a2a;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+  .tld span:nth-child(1){background:#3a3a3a}
+  .tld span:nth-child(2){background:#3a3a3a}
+  .tld span:nth-child(3){background:#3a3a3a}
+  .pv-title{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:500;color:#e6e6e6}
+  .pv-title .mark{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;
+    background:linear-gradient(140deg,#2a2a2a,#0d0d0d);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.06);
+    font-family:var(--serif);font-size:.78rem;line-height:1}
+  .pv-tag{margin-left:6px;font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;
+    color:var(--ink-faint);border:1px solid var(--line);border-radius:5px;padding:2px 6px}
+  .pv-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .pv-chip{font-family:var(--mono);font-size:.66rem;color:var(--ink-muted);
+    border:1px solid var(--line);border-radius:6px;padding:4px 8px;background:rgba(255,255,255,.02);
+    display:inline-flex;align-items:center;gap:6px}
+  .pv-chip .led{width:5px;height:5px;border-radius:50%;background:var(--warm);box-shadow:0 0 6px var(--warm)}
+
+  .pv-body{display:grid;grid-template-columns:240px 1fr;min-height:380px}
+  .pv-side{border-right:1px solid var(--line-soft);padding:18px 14px;background:rgba(0,0,0,.18)}
+  .pv-search{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font-size:.78rem;color:var(--ink-faint);background:rgba(255,255,255,.02);margin-bottom:14px}
+  .pv-search .kbd{margin-left:auto;font-family:var(--mono);font-size:.62rem;color:var(--ink-muted);
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;background:rgba(255,255,255,.03)}
+  .pv-label{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--ink-faint);padding:6px 6px;margin-top:4px}
+  .pv-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:7px;font-size:.82rem;color:var(--ink-muted);
+    transition:background .15s}
+  .pv-row:hover{background:rgba(255,255,255,.03);color:var(--ink)}
+  .pv-row.on{background:rgba(255,255,255,.05);color:#fff}
+  .pv-row .fav{width:6px;height:6px;border-radius:50%;background:var(--warm)}
+  .pv-row .dom{margin-left:auto;font-family:var(--mono);font-size:.62rem;color:var(--ink-faint)}
+
+  .pv-main{padding:22px 26px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+  .bub{max-width:78%;font-size:.86rem;line-height:1.55;border-radius:12px;padding:10px 13px}
+  .bub.me{align-self:flex-end;background:rgba(255,255,255,.08);color:#f0f0f0;border-bottom-right-radius:4px;
+    border:1px solid var(--line)}
+  .ai{align-self:flex-start;max-width:92%}
+  .ai .lead{font-size:.88rem;color:#fff;margin-bottom:8px}
+  .ai ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+  .ai li{position:relative;padding-left:18px;font-size:.84rem;color:var(--ink-muted);line-height:1.55}
+  .ai li::before{content:"";position:absolute;left:3px;top:9px;width:5px;height:5px;border-radius:50%;background:var(--warm)}
+  .ai li code{font-family:var(--mono);font-size:.76rem;color:#ffd1b8;background:var(--warm-soft);padding:1px 6px;border-radius:5px}
+  .pv-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+  .act{font-family:var(--mono);font-size:.66rem;color:var(--ink-muted);
+    border:1px solid var(--line);background:rgba(255,255,255,.02);border-radius:7px;padding:5px 9px}
+  .act.on{color:#ffd1b8;border-color:rgba(255,157,107,.4);background:var(--warm-soft)}
+
+  @media(max-width:780px){
+    .pv-body{grid-template-columns:1fr}
+    .pv-side{display:none}
+    .float-ic{width:64px;height:64px;border-radius:18px}
+    .float-ic svg{width:32px;height:32px}
+    .float-ic.openai    { top:8%;  left:4%;}
+    .float-ic.anthropic { top:6%;  right:4%;}
+    .float-ic.gemini    { top:75%; left:4%;}
+    .float-ic.openrouter{ top:73%; right:4%;}
+  }
+
+  /* ============ section scaffolding ============ */
+  section{position:relative}
+  .band{padding-block:clamp(80px,9vw,128px);position:relative;z-index:2}
+  .sec-eye{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);
+    font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);
+    border:1px solid var(--line);border-radius:999px;padding:5px 12px;background:rgba(255,255,255,.02)}
+  .sec-head{text-align:center;margin-inline:auto;max-width:38rem}
+  .sec-head h2{font-family:var(--serif);font-weight:400;
+    font-size:clamp(2rem,4vw,3.2rem);line-height:1.1;letter-spacing:-.015em;margin-top:18px;color:#fff}
+  .sec-head h2 em{font-style:italic}
+  .sec-head .dek{margin-top:18px;color:var(--ink-muted);font-size:1.02rem;line-height:1.55}
+
+  /* ============ FEATURES — clean cards on the grid ============ */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:clamp(48px,5vw,72px)}
+  @media(max-width:880px){.feat-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:580px){.feat-grid{grid-template-columns:1fr}}
+  .feat{position:relative;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.005));
+    border-radius:16px;padding:24px;transition:border-color .25s, transform .25s;overflow:hidden}
+  .feat:hover{border-color:rgba(255,255,255,.16);transform:translateY(-2px)}
+  .feat-ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(140deg,#222,#0a0a0a);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 0 0 1px rgba(255,255,255,.05);
+    color:#fff;margin-bottom:18px}
+  .feat h3{font-family:var(--serif);font-size:1.4rem;font-weight:400;letter-spacing:-.01em;margin-bottom:9px;color:#fff}
+  .feat p{font-size:.92rem;color:var(--ink-muted);line-height:1.55}
+
+  /* ============ PROVIDERS row ============ */
+  .providers{background:transparent}
+  .prov-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:clamp(28px,4vw,56px);margin-top:clamp(40px,5vw,56px)}
+  .prov{display:inline-flex;align-items:center;gap:12px;opacity:.72;transition:opacity .22s}
+  .prov:hover{opacity:1}
+  .prov-svg{width:32px;height:32px;display:grid;place-items:center}
+  .prov-svg svg{width:100%;height:100%}
+  .prov .nm{font-family:var(--serif);font-size:1.4rem;letter-spacing:-.01em;color:#fff}
+  .prov-or{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;color:var(--ink-faint)}
+
+  /* ============ DOWNLOAD ============ */
+  .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:clamp(48px,5vw,64px)}
+  @media(max-width:880px){.dl-grid{grid-template-columns:1fr}}
+  .dl{display:flex;flex-direction:column;gap:14px;border:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.005));
+    border-radius:16px;padding:26px;transition:border-color .22s, transform .22s}
+  .dl:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.16)}
+  .dl.feature{border-color:rgba(255,157,107,.35)}
+  .dl.feature:hover{border-color:rgba(255,157,107,.55)}
+  .dl-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .dl-top h3{font-family:var(--serif);font-size:1.5rem;font-weight:400;letter-spacing:-.01em;color:#fff}
+  .tag{font-family:var(--mono);font-size:.62rem;border-radius:999px;padding:3px 10px;letter-spacing:.06em;text-transform:uppercase}
+  .tag.rec{background:var(--warm-soft);color:#ffc9aa;border:1px solid rgba(255,157,107,.3)}
+  .tag.stable{background:rgba(108,224,170,.12);color:#9fefc6;border:1px solid rgba(108,224,170,.25)}
+  .tag.preview{background:rgba(180,140,255,.12);color:#cfb6ff;border:1px solid rgba(180,140,255,.25)}
+  .dl p.desc{color:var(--ink-muted);font-size:.93rem;flex:1;line-height:1.55}
+  .dl .meta{font-family:var(--mono);font-size:.7rem;color:var(--ink-faint)}
+  .soon{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:999px;
+    padding:10px 18px;border:1px solid var(--line);background:rgba(255,255,255,.02);
+    color:var(--ink-muted);font-size:.88rem;font-weight:500}
+  .soon .led{width:7px;height:7px;border-radius:50%;background:var(--warm);box-shadow:0 0 8px var(--warm)}
+  .dl .pill, .dl .soon{margin-top:auto;width:100%}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:32px}
+  @media(max-width:880px){.steps{grid-template-columns:1fr}}
+  .step{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-soft);
+    background:rgba(255,255,255,.015);border-radius:12px;padding:16px 18px}
+  .step .n{font-family:var(--mono);font-size:.78rem;color:#ffc9aa;border:1px solid rgba(255,157,107,.3);
+    border-radius:6px;width:24px;height:24px;display:grid;place-items:center;flex:none;background:var(--warm-soft)}
+  .step p{font-size:.88rem;color:var(--ink-muted);line-height:1.5}
+  .step p b{color:var(--ink);font-weight:500}
+  .step code{font-family:var(--mono);font-size:.78rem;color:#ffc9aa}
+  .dl-fine{margin-top:30px;font-size:.88rem;color:var(--ink-faint);text-align:center}
+  .dl-fine a{color:#fff;text-decoration:underline;text-underline-offset:3px}
+
+  /* ============ PRIVACY pull-quote ============ */
+  .quote{padding-block:clamp(80px,9vw,120px);text-align:center;position:relative;z-index:2}
+  .quote q{font-family:var(--serif);font-style:italic;font-size:clamp(1.7rem,3.6vw,2.8rem);
+    line-height:1.2;letter-spacing:-.015em;color:#fff;display:block;max-width:42rem;margin-inline:auto}
+  .quote q::before, .quote q::after{content:""}
+  .quote .qfoot{margin-top:24px;font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--ink-faint)}
+
+  /* ============ FOOTER ============ */
+  footer{position:relative;z-index:2;border-top:1px solid var(--line-soft);background:#000}
+  .foot{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;padding-block:32px}
+  .foot-brand{display:flex;align-items:center;gap:10px;color:var(--ink-muted);font-size:.9rem}
+  .foot-brand .brand{color:var(--ink)}
+  .foot-nav{display:flex;flex-wrap:wrap;gap:24px;font-size:.9rem;color:var(--ink-muted)}
+  .foot-nav a{transition:color .18s}
+  .foot-nav a:hover{color:#fff}
+  .foot-fine{border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:.7rem;
+    color:var(--ink-faint);padding-block:18px;letter-spacing:.05em}
+
+  /* reveal */
+  .reveal{opacity:1}
+  @supports (animation-timeline:view()){
+    @media (prefers-reduced-motion:no-preference){
+      .reveal{animation:reveal-in linear both;animation-timeline:view();animation-range:entry 2% cover 28%}
+    }
+  }
+  @keyframes reveal-in{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+
+  /* mobile nav tweak */
+  @media(max-width:560px){
+    .nav-right .pill-ghost .lbl{display:none}
+    .hero{padding-top:7rem}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg" aria-hidden="true"></div>
+
+<header>
+  <nav aria-label="Primary">
+    <a href="#top" class="brand">
+      <span class="mark">A</span><span>Askpane</span>
+    </a>
+    <div class="nav-right">
+      <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener" class="pill pill-ghost">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.27 2.75 1.05a9.4 9.4 0 0 1 2.5-.35c.85 0 1.71.12 2.5.35 1.91-1.32 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.04 10.04 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>
+        <span class="lbl">GitHub</span>
+      </a>
+      <a href="#download" class="pill pill-solid">Download</a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+
+  <!-- ================ HERO ================ -->
+  <section class="hero">
+    <div class="glow" aria-hidden="true"></div>
+
+    <div class="floaters" aria-hidden="true">
+      <div class="float-ic openai" title="OpenAI">
+        <svg viewBox="0 0 256 260" aria-hidden="true"><path fill="#fff" d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Zm21.742-32.69-1.535-.922-51.619-30.081a8.39 8.39 0 0 0-8.492 0L99.98 99.808V74.587a.716.716 0 0 1 .307-.665l52.233-30.133a48.652 48.652 0 0 1 72.236 50.391v.205ZM88.061 139.097l-21.845-12.585a.87.87 0 0 1-.41-.614V65.685a48.652 48.652 0 0 1 79.757-37.346l-1.535.87-51.67 29.825a8.595 8.595 0 0 0-4.246 7.367l-.051 72.697Zm11.868-25.58 28.138-16.217 28.188 16.218v32.434l-28.086 16.218-28.188-16.218-.052-32.434Z"/></svg>
+      </div>
+      <div class="float-ic anthropic" title="Claude">
+        <svg viewBox="0 0 24 24" fill="#ff9d6b" fill-rule="evenodd" aria-hidden="true"><path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z"/></svg>
+      </div>
+      <div class="float-ic gemini" title="Gemini">
+        <svg viewBox="0 0 296 298" fill="none" aria-hidden="true"><path fill="#fff" d="M141.201 4.886c2.282-6.17 11.042-6.071 13.184.148l5.985 17.37a184.004 184.004 0 0 0 111.257 113.049l19.304 6.997c6.143 2.227 6.156 10.91.02 13.155l-19.35 7.082a184.001 184.001 0 0 0-109.495 109.385l-7.573 20.629c-2.241 6.105-10.869 6.121-13.133.025l-7.908-21.296a184 184 0 0 0-109.02-108.658l-19.698-7.239c-6.102-2.243-6.118-10.867-.025-13.132l20.083-7.467A183.998 183.998 0 0 0 133.291 26.28l7.91-21.394Z"/></svg>
+      </div>
+      <div class="float-ic openrouter" title="OpenRouter">
+        <svg viewBox="0 0 512 512" fill="#fff" stroke="#fff" aria-hidden="true"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="60" fill="none"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="60" fill="none"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></svg>
+      </div>
+    </div>
+
+    <div class="hero-inner">
+      <span class="eyebrow enter d1"><span class="dot"></span>Manifest V3 · BYOK · Local-first</span>
+      <h1 class="hero-title enter d2">The side-panel<br><em>copilot</em> for the open web.</h1>
+      <p class="hero-sub enter d3">Read pages, summarize articles, rewrite drafts, dig into code — without leaving the tab. Plug in OpenAI, Claude, Gemini, or route everything through one OpenRouter key.</p>
+      <div class="hero-cta enter d4">
+        <a href="#download" class="pill pill-solid pill-lg">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>
+          Download for Chrome
+        </a>
+        <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener" class="pill pill-ghost pill-lg">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-.88-.01-1.73-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.27 2.75 1.05a9.4 9.4 0 0 1 2.5-.35c.85 0 1.71.12 2.5.35 1.91-1.32 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.6.69.49A10.04 10.04 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+      <p class="hero-fine enter d5">Free &amp; open source · <span>Your keys, your data, no hosted backend</span></p>
+    </div>
+
+    <!-- app preview -->
+    <div class="preview-wrap enter d5">
+      <div class="preview-inner">
+        <div class="preview" role="img" aria-label="The Askpane side panel summarizing the current page into three bullets.">
+          <div class="pv-head">
+            <div class="tld"><span></span><span></span><span></span></div>
+            <div class="pv-title">
+              <span class="mark">A</span>
+              Askpane
+              <span class="pv-tag mono">side panel · v0.0.0</span>
+            </div>
+            <div class="pv-right">
+              <span class="pv-chip"><span class="led"></span>gpt-4o-mini</span>
+              <span class="pv-chip">⌘⇧A</span>
+            </div>
+          </div>
+          <div class="pv-body">
+            <aside class="pv-side">
+              <div class="pv-search">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <span>Search history</span>
+                <span class="kbd">⌘K</span>
+              </div>
+              <div class="pv-label">Today</div>
+              <div class="pv-row on">
+                <span class="fav"></span>
+                <span>Server-Sent Events overview</span>
+                <span class="dom">mdn</span>
+              </div>
+              <div class="pv-row">
+                <span>Rewrite this PR description</span>
+                <span class="dom">github</span>
+              </div>
+              <div class="pv-row">
+                <span>Explain useTransition</span>
+                <span class="dom">react.dev</span>
+              </div>
+              <div class="pv-label">Yesterday</div>
+              <div class="pv-row">
+                <span>Translate quickstart to JP</span>
+                <span class="dom">vite.dev</span>
+              </div>
+              <div class="pv-row">
+                <span>Summarize quarterly memo</span>
+                <span class="dom">notion</span>
+              </div>
+            </aside>
+            <div class="pv-main">
+              <div class="bub me">Summarize this article in 3 bullets.</div>
+              <div class="ai">
+                <p class="lead">Here's the gist of the page you're on:</p>
+                <ul>
+                  <li>SSE streams tokens over one long-lived HTTP connection.</li>
+                  <li>The client reads an <code>EventSource</code> and appends as they arrive.</li>
+                  <li>Reconnect logic and backpressure are the main gotchas.</li>
+                </ul>
+                <div class="pv-actions">
+                  <span class="act on">Summarize</span>
+                  <span class="act">Explain</span>
+                  <span class="act">Translate</span>
+                  <span class="act">Rewrite</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================ FEATURES ================ -->
+  <section id="features" class="band">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-eye">Features</span>
+        <h2>A reading &amp; research <em>copilot</em>, built into the browser.</h2>
+        <p class="dek">Designed for long-form web content — articles, documentation, technical references, and business pages.</p>
+      </div>
+      <div class="feat-grid">
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"/></svg>
+          </div>
+          <h3>Reads the page for you</h3>
+          <p>Extracts the readable text of the current tab and uses it as context. No copy-pasting articles, docs, or code.</p>
+        </article>
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4zM14 4v16"/></svg>
+          </div>
+          <h3>Side-panel, per tab</h3>
+          <p>Opens in Chrome's side panel with its own session per tab, so switching pages never mixes conversations.</p>
+        </article>
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+          </div>
+          <h3>Quick actions</h3>
+          <p>One click to summarize, explain, rewrite, translate, simplify, or explain code — on the page, a selection, or pasted text.</p>
+        </article>
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4M5 11h14v9H5z"/></svg>
+          </div>
+          <h3>Bring your own key</h3>
+          <p>Use your own OpenAI or OpenRouter key. OpenRouter unlocks Claude, Gemini, and more model families through one key.</p>
+        </article>
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6z"/></svg>
+          </div>
+          <h3>Local-first &amp; private</h3>
+          <p>Keys and chat history stay on your machine. Page content is sent only when you ask. Exclude sites or disable history anytime.</p>
+        </article>
+        <article class="feat reveal">
+          <div class="feat-ic">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M3 12h3m12 0h3M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1"/><circle cx="12" cy="12" r="3.2"/></svg>
+          </div>
+          <h3>Your models, your way</h3>
+          <p>Pick default providers and models, favorite the ones you use, hide the rest. Stop streamed responses mid-answer.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================ PRIVACY pull-quote ================ -->
+  <section class="quote">
+    <div class="wrap">
+      <div class="reveal">
+        <q>Your keys and history never leave your machine. Page content is sent only when you ask.</q>
+        <p class="qfoot">Local-first · Bring-your-own-key · No hosted backend</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================ PROVIDERS ================ -->
+  <section id="providers" class="providers band">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-eye">Providers</span>
+        <h2>Bring <em>any</em> model. Or all of them.</h2>
+        <p class="dek">Plug in your own key for OpenAI, or route Claude, Gemini, and dozens of others through a single OpenRouter key.</p>
+      </div>
+      <div class="prov-row reveal">
+        <span class="prov" title="OpenAI">
+          <span class="prov-svg"><svg viewBox="0 0 256 260" aria-hidden="true"><path fill="#fff" d="M239.184 106.203a64.716 64.716 0 0 0-5.576-53.103C219.452 28.459 191 15.784 163.213 21.74A65.586 65.586 0 0 0 52.096 45.22a64.716 64.716 0 0 0-43.23 31.36c-14.31 24.602-11.061 55.634 8.033 76.74a64.665 64.665 0 0 0 5.525 53.102c14.174 24.65 42.644 37.324 70.446 31.36a64.72 64.72 0 0 0 48.754 21.744c28.481.025 53.714-18.361 62.414-45.481a64.767 64.767 0 0 0 43.229-31.36c14.137-24.558 10.875-55.423-8.083-76.483Zm-97.56 136.338a48.397 48.397 0 0 1-31.105-11.255l1.535-.87 51.67-29.825a8.595 8.595 0 0 0 4.247-7.367v-72.85l21.845 12.636c.218.111.37.32.409.563v60.367c-.056 26.818-21.783 48.545-48.601 48.601Zm-104.466-44.61a48.345 48.345 0 0 1-5.781-32.589l1.534.921 51.722 29.826a8.339 8.339 0 0 0 8.441 0l63.181-36.425v25.221a.87.87 0 0 1-.358.665l-52.335 30.184c-23.257 13.398-52.97 5.431-66.404-17.803ZM23.549 85.38a48.499 48.499 0 0 1 25.58-21.333v61.39a8.288 8.288 0 0 0 4.195 7.316l62.874 36.272-21.845 12.636a.819.819 0 0 1-.767 0L41.353 151.53c-23.211-13.454-31.171-43.144-17.804-66.405v.256Zm179.466 41.695-63.08-36.63L161.73 77.86a.819.819 0 0 1 .768 0l52.233 30.184a48.6 48.6 0 0 1-7.316 87.635v-61.391a8.544 8.544 0 0 0-4.4-7.213Z"/></svg></span>
+          <span class="nm">OpenAI</span>
+        </span>
+        <span class="prov" title="Claude">
+          <span class="prov-svg"><svg viewBox="0 0 24 24" fill="#fff" fill-rule="evenodd" aria-hidden="true"><path d="M13.827 3.52h3.603L24 20h-3.603l-6.57-16.48zm-7.258 0h3.767L16.906 20h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm4.132 9.959L8.453 7.687 6.205 13.48H10.7z"/></svg></span>
+          <span class="nm">Claude</span>
+        </span>
+        <span class="prov" title="Gemini">
+          <span class="prov-svg"><svg viewBox="0 0 296 298" fill="none" aria-hidden="true"><path fill="#fff" d="M141.201 4.886c2.282-6.17 11.042-6.071 13.184.148l5.985 17.37a184.004 184.004 0 0 0 111.257 113.049l19.304 6.997c6.143 2.227 6.156 10.91.02 13.155l-19.35 7.082a184.001 184.001 0 0 0-109.495 109.385l-7.573 20.629c-2.241 6.105-10.869 6.121-13.133.025l-7.908-21.296a184 184 0 0 0-109.02-108.658l-19.698-7.239c-6.102-2.243-6.118-10.867-.025-13.132l20.083-7.467A183.998 183.998 0 0 0 133.291 26.28l7.91-21.394Z"/></svg></span>
+          <span class="nm">Gemini</span>
+        </span>
+        <span class="prov-or">VIA</span>
+        <span class="prov" title="OpenRouter">
+          <span class="prov-svg"><svg viewBox="0 0 512 512" fill="#fff" stroke="#fff" aria-hidden="true"><path d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="60" fill="none"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="60" fill="none"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></svg></span>
+          <span class="nm">OpenRouter</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================ DOWNLOAD ================ -->
+  <section id="download" class="band">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-eye">Download</span>
+        <h2>Three ways to <em>install</em>.</h2>
+        <p class="dek">One-click from the Chrome Web Store soon — for now, grab a build and load it unpacked while the listing is in review.</p>
+      </div>
+      <div class="dl-grid">
+        <article class="dl feature reveal">
+          <div class="dl-top">
+            <h3>Chrome Web Store</h3>
+            <span class="tag rec">Recommended</span>
+          </div>
+          <p class="desc">One-click install with automatic updates. No developer mode required.</p>
+          <span class="soon"><span class="led"></span>Coming soon</span>
+        </article>
+        <article class="dl reveal">
+          <div class="dl-top">
+            <h3>Stable build</h3>
+            <span class="tag stable">Stable</span>
+          </div>
+          <p class="desc">The recommended manual build — tested and stable.</p>
+          <span class="meta">Not published yet</span>
+          <a href="https://github.com/microDotBuilder/ask-ai/releases/latest" target="_blank" rel="noopener" class="pill pill-ghost">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+            View releases
+          </a>
+        </article>
+        <article class="dl reveal">
+          <div class="dl-top">
+            <h3>Alpha build</h3>
+            <span class="tag preview">Preview</span>
+          </div>
+          <p class="desc">Bleeding-edge preview. New features first — expect rough edges.</p>
+          <span class="meta">Alpha 0.0.0 (ab99656) · 727 KB</span>
+          <a href="https://github.com/microDotBuilder/ask-ai/releases/download/v0.0.0-alpha.20260613.1823/ask-ai-0.0.0-alpha-chrome-mv3.zip" class="pill pill-ghost">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+            Download ZIP
+          </a>
+        </article>
+      </div>
+
+      <div class="steps reveal" aria-label="Loading a downloaded build">
+        <div class="step"><span class="n mono">1</span><p>Unzip the downloaded file.</p></div>
+        <div class="step"><span class="n mono">2</span><p>Open <code>chrome://extensions</code> and toggle <b>Developer mode</b>.</p></div>
+        <div class="step"><span class="n mono">3</span><p>Click <b>Load unpacked</b> and pick the unzipped folder.</p></div>
+      </div>
+
+      <p class="dl-fine">Same ZIP works on macOS, Windows, and Linux. Requires Chrome 116+. See all builds on
+        <a href="https://github.com/microDotBuilder/ask-ai/releases" target="_blank" rel="noopener">GitHub Releases</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="foot-brand">
+        <a href="#top" class="brand"><span class="mark">A</span><span>Askpane</span></a>
+        <span>— Ask anything about the page you're viewing.</span>
+      </div>
+      <nav class="foot-nav" aria-label="Footer">
+        <a href="#features">Features</a>
+        <a href="#providers">Providers</a>
+        <a href="#download">Download</a>
+        <a href="/privacy">Privacy</a>
+        <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </div>
+  <div class="foot-fine">
+    <div class="wrap">Free &amp; open source · Local-first · Your key, your data · © 2026 Askpane</div>
+  </div>
+</footer>
+
+</body>
+</html>

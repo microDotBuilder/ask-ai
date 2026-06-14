@@ -1,5 +1,4 @@
 import type { AskAiSettings, InternalModelId, ProviderId } from "@askai/core";
-import { Sparkles } from "lucide-react";
 import { useEffect } from "react";
 import { useSidepanelStore } from "../../store/sidepanelstore";
 import { getVisibleSetupModels } from "../utils/misc";
@@ -33,7 +32,7 @@ export function SetupPanel({ settings }: { settings: AskAiSettings }) {
   return (
     <main className="setup-shell">
       <header className="setup-header">
-        <Sparkles size={18} aria-hidden="true" />
+        <img className="setup-logo" src="/brand-logo.png" alt="" aria-hidden="true" width={28} height={28} />
         <div>
           <h1>Set up Ask AI</h1>
           <p>Connect a provider to start chatting with the current tab.</p>

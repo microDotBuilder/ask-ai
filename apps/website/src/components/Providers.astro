@@ -1,33 +1,30 @@
 ---
-const families = [
-  { name: "OpenAI", src: "/providers/openai.svg" },
-  { name: "Claude", src: "/providers/anthropic.svg" },
-  { name: "Gemini", src: "/providers/gemenai.svg" },
+const providers = [
+  { name: "OpenAI", models: "GPT", src: "/providers/openai.svg" },
+  { name: "Anthropic", models: "Claude", src: "/providers/anthropic.svg" },
+  { name: "Google", models: "Gemini", src: "/providers/gemenai.svg" },
 ];
 ---
 
-<section id="providers" class="border-y border-line bg-panel/30">
-  <div class="mx-auto max-w-content px-5 py-14 sm:px-8">
-    <div class="flex flex-col items-center gap-8 text-center">
-      <p class="max-w-2xl text-pretty text-ink-muted">
-        Plug in your <span class="text-ink">OpenAI</span> or
-        <span class="text-ink">OpenRouter</span> key. OpenRouter routes unlock extra model families —
-        Claude, Gemini, and more — through a single key.
-      </p>
-      <div class="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 opacity-90">
-        {
-          families.map((p) => (
-            <div class="flex items-center gap-2.5 text-ink-muted">
-              <img src={p.src} width="26" height="26" alt="" class="opacity-80" />
-              <span class="text-sm font-medium">{p.name}</span>
-            </div>
-          ))
-        }
-        <div class="flex items-center gap-2.5 text-ink-muted">
-          <span class="flex h-[26px] w-[26px] items-center justify-center rounded-md border border-line font-mono text-[11px]">OR</span>
-          <span class="text-sm font-medium">OpenRouter</span>
-        </div>
-      </div>
+<section id="providers" class="border-y border-line bg-gradient-to-b from-[#080a0d] to-bg">
+  <div class="mx-auto max-w-content px-6 py-16 text-center">
+    <div class="mb-[18px] font-mono text-[11.5px] uppercase tracking-[0.1em] text-accent">Providers</div>
+    <p class="mx-auto max-w-[60ch] text-[1.06rem] text-ink-muted">
+      Plug in your own key for <b class="font-semibold text-ink">OpenAI</b>,
+      <b class="font-semibold text-ink">Anthropic</b>, or
+      <b class="font-semibold text-ink">Google</b> — or route all of them through a single
+      <b class="font-semibold text-ink">OpenRouter</b> key.
+    </p>
+    <div class="mt-9 flex flex-wrap justify-center gap-[14px]">
+      {
+        providers.map((p) => (
+          <span class="flex items-center gap-2.5 rounded-xl border border-line bg-panel px-[22px] py-[14px] text-ink">
+            <img src={p.src} alt="" class="h-6 w-6 object-contain" />
+            <span class="font-display text-[15px] font-semibold">{p.name}</span>
+            <span class="font-mono text-[11px] text-ink-faint">{p.models}</span>
+          </span>
+        ))
+      }
     </div>
   </div>
 </section>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Askpane — Ask AI about any webpage in Chrome's side panel</title>
+<meta name="description" content="Askpane is a Chrome side-panel assistant that reads the current webpage and answers questions about it. Bring your own OpenAI or OpenRouter key — no hosted backend, history stays on your machine.">
+<meta name="theme-color" content="#0a0b0e">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050608;
+    --bg-2:#080a0d;
+    --panel:#0e1014;
+    --panel-2:#15181e;
+    --panel-3:#1d2027;
+    --line:rgba(255,255,255,.07);
+    --line-soft:rgba(255,255,255,.04);
+    --ink:#eceef4;
+    --ink-muted:#9aa1b0;
+    --ink-faint:#646c7c;
+    --accent:#e0e3eb;
+    --accent-bright:#fff;
+    --accent-deep:#9aa1b0;
+    --glow:rgba(255,255,255,.05);
+    --ok:#56d8a6;
+    --warn:#e7b15a;
+    --maxw:1180px;
+    --sans:"Hanken Grotesk",system-ui,sans-serif;
+    --display:"Geist","Space Grotesk",system-ui,sans-serif;
+    --mono:"Geist Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(124,135,255,.32);color:#fff}
+  h1,h2,h3{font-family:var(--display);letter-spacing:-.02em;line-height:1.05;font-weight:600}
+  .mono{font-family:var(--mono)}
+
+  /* layout */
+  .wrap{max-width:var(--maxw);margin-inline:auto;padding-inline:24px}
+  section{position:relative}
+
+  /* ---------- background texture ---------- */
+  .bg-grid{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(to right,rgba(255,255,255,.035) 1px,transparent 1px),
+      linear-gradient(to bottom,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:72px 72px;
+  }
+  .bg-aura{display:none}
+  .page{position:relative;z-index:1}
+
+  /* ---------- header ---------- */
+  header{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line-soft);
+    background:rgba(10,11,14,.72);backdrop-filter:blur(14px) saturate(140%)}
+  nav{display:flex;align-items:center;justify-content:space-between;gap:16px;
+    height:62px;max-width:var(--maxw);margin-inline:auto;padding-inline:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:600;letter-spacing:-.01em}
+  .mark{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:#15181e;border:1px solid rgba(255,255,255,.1);
+    font-family:var(--display);font-weight:700;font-size:15px;color:#fff;letter-spacing:-.02em}
+  .nav-links{display:flex;align-items:center;gap:30px;font-size:14.5px;color:var(--ink-muted)}
+  .nav-links a{transition:color .18s}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-right{display:flex;align-items:center;gap:18px}
+  .nav-right .ghost{font-size:14.5px;color:var(--ink-muted);transition:color .18s}
+  .nav-right .ghost:hover{color:var(--ink)}
+  @media(max-width:840px){.nav-links,.nav-right .ghost{display:none}}
+
+  /* ---------- buttons ---------- */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    border-radius:11px;font-weight:600;font-size:14.5px;cursor:pointer;
+    transition:transform .16s ease,background .2s,border-color .2s,box-shadow .2s;white-space:nowrap}
+  .btn-primary{background:#fff;color:#0a0b0e;padding:9px 16px;font-size:14px}
+  .btn-primary:hover{transform:translateY(-1px);background:#e9eaee}
+  .btn-ghost{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:11px 18px}
+  .btn-ghost:hover{background:var(--panel-2);border-color:rgba(255,255,255,.16)}
+  .btn-lg{padding:14px 24px;font-size:15.5px;border-radius:13px}
+
+  /* ---------- hero ---------- */
+  .hero{padding-top:120px;padding-bottom:30px;text-align:center}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);
+    font-size:11.5px;letter-spacing:.02em;color:var(--ink-muted);
+    border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 14px;white-space:nowrap;max-width:100%}
+  @media(max-width:480px){.eyebrow{white-space:normal;text-align:left}}
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+  .eyebrow b{color:var(--ink);font-weight:500}
+  h1.hero-title{font-size:clamp(2.8rem,7.2vw,5.4rem);margin:34px auto 0;max-width:14ch;font-weight:600;letter-spacing:-.028em;line-height:1.02}
+  h1.hero-title .accent{color:var(--ink)}
+  .float-logos{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .float-logos .fl{position:absolute;width:84px;height:84px;border-radius:22px;display:grid;place-items:center;
+    background:linear-gradient(160deg,#1a1d24,#0e1014);
+    border:1px solid rgba(255,255,255,.07);
+    box-shadow:0 36px 60px -20px rgba(0,0,0,.9),0 0 0 1px rgba(255,255,255,.03) inset}
+  .float-logos .fl img{width:46px;height:46px;object-fit:contain}
+  .float-logos .fl.a{top:96px;left:2%;animation:floaty-a 4.2s ease-in-out infinite}
+  .float-logos .fl.b{top:78px;right:2%;animation:floaty-b 4.2s ease-in-out .8s infinite}
+  .float-logos .fl.c{top:470px;right:3%;animation:floaty-c 4.2s ease-in-out 1.4s infinite}
+  @keyframes floaty-a{0%,100%{transform:rotate(-11deg) translateY(0)}50%{transform:rotate(-11deg) translateY(-20px)}}
+  @keyframes floaty-b{0%,100%{transform:rotate(9deg) translateY(0)}50%{transform:rotate(9deg) translateY(-20px)}}
+  @keyframes floaty-c{0%,100%{transform:rotate(-6deg) translateY(0)}50%{transform:rotate(-6deg) translateY(-20px)}}
+  @media(max-width:760px){.float-logos{display:none}}
+  .hero-sub{max-width:60ch;margin:24px auto 0;color:var(--ink-muted);font-size:clamp(1rem,1.6vw,1.18rem)}
+  .hero-cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:34px}
+  .pill-soon{display:inline-flex;align-items:center;gap:10px;border-radius:13px;
+    border:1px solid rgba(124,135,255,.32);background:rgba(124,135,255,.08);
+    color:var(--ink);font-weight:600;font-size:15.5px;padding:14px 22px}
+  .ping{position:relative;width:9px;height:9px}
+  .ping::before{content:"";position:absolute;inset:0;border-radius:50%;background:var(--accent);
+    animation:ping 1.8s cubic-bezier(0,0,.2,1) infinite}
+  .ping::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--accent)}
+  @keyframes ping{75%,100%{transform:scale(2.4);opacity:0}}
+  .hero-fine{margin-top:18px;font-size:12.5px;color:var(--ink-faint);font-family:var(--mono)}
+
+  /* ---------- product mockup ---------- */
+  .shot{max-width:980px;margin:60px auto 0;position:relative}
+  .shot::after{content:"";position:absolute;inset:auto 8% -40px 8%;height:90px;
+    background:radial-gradient(50% 100% at 50% 0,var(--glow),transparent 70%);filter:blur(10px);z-index:-1}
+  .browser{border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    background:var(--panel);box-shadow:0 40px 90px -40px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.02)}
+  .browser-bar{display:flex;align-items:center;gap:14px;padding:11px 16px;
+    background:var(--panel-2);border-bottom:1px solid var(--line-soft)}
+  .traffic{display:flex;gap:7px}
+  .traffic span{width:11px;height:11px;border-radius:50%;background:#33373f}
+  .urlbar{flex:1;display:flex;align-items:center;gap:8px;height:28px;border-radius:8px;
+    background:var(--bg);border:1px solid var(--line-soft);padding:0 12px;
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);max-width:380px;margin-inline:auto}
+  .urlbar .lock{color:var(--ok)}
+  .browser-body{display:grid;grid-template-columns:1fr 340px;min-height:430px;background:var(--bg-2)}
+
+  /* left: fake article */
+  .page-col{padding:30px 34px;border-right:1px solid var(--line-soft);overflow:hidden}
+  .page-col .kicker{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.08em;text-transform:uppercase}
+  .page-col h4{font-family:var(--display);font-size:23px;font-weight:600;margin:12px 0 18px;color:#dfe2ea;max-width:22ch;line-height:1.2}
+  .lines{display:flex;flex-direction:column;gap:11px}
+  .ln{height:9px;border-radius:5px;background:var(--panel-3)}
+  .ln.soft{background:var(--panel-2)}
+  .page-col .sub{margin-top:24px;height:11px;width:42%;border-radius:5px;background:var(--panel-3)}
+
+  /* right: side panel */
+  .panel-col{display:flex;flex-direction:column;background:var(--panel);border-left:1px solid var(--line)}
+  .panel-head{display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--line-soft)}
+  .panel-head .mark{width:22px;height:22px;font-size:12px;border-radius:6px}
+  .panel-head .pname{font-family:var(--display);font-weight:600;font-size:14px}
+  .panel-head .ctx{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink-faint);
+    border:1px solid var(--line-soft);border-radius:6px;padding:3px 7px;display:flex;gap:5px;align-items:center}
+  .panel-head .ctx i{width:5px;height:5px;border-radius:50%;background:var(--ok);font-style:normal}
+  .chat{flex:1;padding:16px;display:flex;flex-direction:column;gap:13px;overflow:hidden}
+  .bub{max-width:86%;font-size:13px;line-height:1.55;border-radius:14px;padding:10px 13px}
+  .bub.me{align-self:flex-end;background:linear-gradient(180deg,var(--accent),var(--accent-deep));
+    color:#fff;border-bottom-right-radius:5px}
+  .bub.ai{align-self:flex-start;background:var(--panel-3);color:var(--ink);border-bottom-left-radius:5px;border:1px solid var(--line-soft)}
+  .bub.ai b{color:#fff;font-weight:600}
+  .bub.ai ul{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .bub.ai li{position:relative;padding-left:16px;color:var(--ink-muted)}
+  .bub.ai li::before{content:"";position:absolute;left:2px;top:7px;width:5px;height:5px;border-radius:50%;background:var(--accent-bright)}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+  .chip{font-size:11px;font-family:var(--mono);color:var(--ink-muted);border:1px solid var(--line);
+    background:var(--panel-2);border-radius:8px;padding:5px 9px}
+  .chip.on{color:var(--accent-bright);border-color:rgba(124,135,255,.35);background:rgba(124,135,255,.1)}
+  .composer{margin:0 16px 16px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);
+    background:var(--bg);border-radius:11px;padding:9px 11px;font-size:12.5px;color:var(--ink-faint)}
+  .composer .kbd{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--accent-bright);
+    background:rgba(124,135,255,.14);border-radius:6px;padding:3px 7px}
+  @media(max-width:720px){.browser-body{grid-template-columns:1fr}.page-col{display:none}.panel-col{border-left:none}}
+
+  /* ---------- section heading ---------- */
+  .sec{padding:96px 0}
+  .sec-label{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+  .sec h2{font-size:clamp(1.9rem,3.4vw,2.7rem);margin-top:14px;max-width:20ch}
+  .sec .lead{margin-top:16px;color:var(--ink-muted);max-width:58ch;font-size:1.05rem}
+
+  /* ---------- features ---------- */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+  @media(max-width:880px){.feat-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.feat-grid{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    border-radius:16px;padding:26px;transition:border-color .22s,transform .22s,background .22s;position:relative;overflow:hidden}
+  .card:hover{border-color:rgba(124,135,255,.4);transform:translateY(-3px)}
+  .card .ic{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
+    border:1px solid var(--line);background:var(--bg);color:var(--accent-bright);margin-bottom:18px}
+  .card h3{font-size:1.12rem;font-weight:600;margin-bottom:9px}
+  .card p{font-size:.94rem;color:var(--ink-muted);line-height:1.55}
+  .card .num{position:absolute;top:20px;right:22px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+
+  /* ---------- providers ---------- */
+  .providers{border-block:1px solid var(--line);background:linear-gradient(180deg,var(--bg-2),var(--bg))}
+  .providers .wrap{padding-block:64px;text-align:center}
+  .providers p{max-width:60ch;margin:0 auto;color:var(--ink-muted);font-size:1.06rem}
+  .providers p b{color:var(--ink);font-weight:600}
+  .prov-row{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:34px}
+  .prov{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--panel);
+    border-radius:12px;padding:11px 18px;font-weight:500;font-size:14.5px;color:var(--ink)}
+  .prov{padding:14px 22px}
+  .prov img{height:24px;width:24px;object-fit:contain}
+  .prov .pname2{font-family:var(--display);font-weight:600;font-size:15px}
+  .prov .pmodels{font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+
+  /* ---------- download ---------- */
+  .dl-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
+  @media(max-width:880px){.dl-grid{grid-template-columns:1fr}}
+  .dl{display:flex;flex-direction:column;border:1px solid var(--line);background:var(--panel);
+    border-radius:16px;padding:26px}
+  .dl.feature{border-color:rgba(124,135,255,.4);
+    background:linear-gradient(180deg,rgba(124,135,255,.1),var(--panel))}
+  .dl-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+  .dl-top h3{font-size:1.15rem;font-weight:600}
+  .tag{font-family:var(--mono);font-size:10.5px;border-radius:999px;padding:4px 10px;border:1px solid var(--line)}
+  .tag.rec{background:rgba(124,135,255,.16);color:var(--accent-bright);border-color:transparent}
+  .tag.stable{background:rgba(86,216,166,.16);color:var(--ok);border-color:transparent}
+  .tag.preview{background:rgba(231,177,90,.16);color:var(--warn);border-color:transparent}
+  .dl p.desc{color:var(--ink-muted);font-size:.94rem;flex:1}
+  .dl .meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);margin-top:16px}
+  .dl .btn{margin-top:14px;width:100%}
+  .dl-foot{margin-top:26px;font-size:.9rem;color:var(--ink-faint);text-align:center}
+  .dl-foot a{color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);margin-top:20px}
+  .foot-main{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;padding-block:36px}
+  .foot-brand{display:flex;align-items:center;gap:11px;color:var(--ink-muted);font-size:14px}
+  .foot-brand .brand{color:var(--ink)}
+  .foot-nav{display:flex;flex-wrap:wrap;gap:26px;font-size:14px;color:var(--ink-muted)}
+  .foot-nav a{transition:color .18s}
+  .foot-nav a:hover{color:var(--ink)}
+  .foot-fine{border-top:1px solid var(--line-soft);font-family:var(--mono);font-size:11.5px;
+    color:var(--ink-faint);padding-block:18px}
+
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0a0b0e">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0a0b0e"/>
+    <rect x="500" y="290" width="200" height="200" rx="48" fill="#7c87ff"/>
+    <text x="600" y="455" font-family="'Space Grotesk',system-ui,sans-serif" font-size="150" font-weight="700" fill="#0b0c14" text-anchor="middle">A</text>
+    <text x="600" y="590" font-family="'Space Grotesk',system-ui,sans-serif" font-size="56" font-weight="600" fill="#eceef4" text-anchor="middle" letter-spacing="-1">Askpane</text>
+  </svg>
+</template>
+<div class="bg-grid"></div>
+<div class="bg-aura"></div>
+<div class="page">
+
+<header>
+  <nav>
+    <a href="#top" class="brand"><span class="mark">A</span><span>Askpane</span></a>
+    <div class="nav-right">
+      <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener" class="ghost">GitHub</a>
+      <a href="#download" class="btn btn-primary">Download</a>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+  <!-- HERO -->
+  <section class="hero">
+    <div class="float-logos" aria-hidden="true">
+      <span class="fl a"><img src="logo-openai.svg" alt=""></span>
+      <span class="fl b"><img src="logo-claude.svg" alt=""></span>
+      <span class="fl c"><img src="logo-gemini.svg" alt=""></span>
+    </div>
+    <div class="wrap">
+      <h1 class="hero-title">Ask anything about <span class="accent">the page you're viewing.</span></h1>
+      <p class="hero-sub">
+        Askpane lives in Chrome's side panel. It reads the current webpage and answers questions about it —
+        summarize, explain, rewrite, translate, or dig into code, with the page context added automatically.
+      </p>
+      <div class="hero-cta">
+        <a href="#download" class="btn btn-ghost btn-lg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="3.4"/><path d="M12 2a10 10 0 0 1 8.66 5h-9.83a5 5 0 0 0-4.7 3.27L1.84 5.4A10 10 0 0 1 12 2Zm0 20a10 10 0 0 1-8.66-15l4.91 8.5A5 5 0 0 0 12 17a5 5 0 0 0 1.55-.24L9.61 21.84A10 10 0 0 1 12 22Zm10-10a10 10 0 0 1-5.85 9.1l4.92-8.53a5 5 0 0 0-.6-5.57h6.36A10 10 0 0 1 22 12Z" opacity=".7"/></svg>
+          Add to Chrome
+        </a>
+        <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener" class="btn btn-ghost btn-lg">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A12 12 0 0 0 .5 12.5a12 12 0 0 0 8.2 11.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.4-1.3-5.4-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8.1 3.1.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6a12 12 0 0 0 8.2-11.4A12 12 0 0 0 12 .5Z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+      <p class="hero-fine">Free · Coming to Chrome Web Store · Your keys, your data</p>
+
+      <!-- PRODUCT MOCKUP -->
+      <div class="shot">
+        <div class="browser">
+          <div class="browser-bar">
+            <div class="traffic"><span></span><span></span><span></span></div>
+            <div class="urlbar"><span class="lock">●</span>&nbsp;docs.example.com/guide/streaming</div>
+            <div style="width:54px"></div>
+          </div>
+          <div class="browser-body">
+            <!-- left article -->
+            <div class="page-col">
+              <div class="kicker">Documentation</div>
+              <h4>Streaming responses with server-sent events</h4>
+              <div class="lines">
+                <div class="ln" style="width:96%"></div>
+                <div class="ln soft" style="width:100%"></div>
+                <div class="ln soft" style="width:88%"></div>
+                <div class="ln soft" style="width:93%"></div>
+                <div class="ln soft" style="width:70%"></div>
+              </div>
+              <div class="sub"></div>
+              <div class="lines" style="margin-top:16px">
+                <div class="ln soft" style="width:100%"></div>
+                <div class="ln soft" style="width:84%"></div>
+                <div class="ln soft" style="width:91%"></div>
+              </div>
+            </div>
+            <!-- right side panel -->
+            <div class="panel-col">
+              <div class="panel-head">
+                <span class="mark">A</span><span class="pname">Askpane</span>
+                <span class="ctx"><i></i>page in context</span>
+              </div>
+              <div class="chat">
+                <div class="bub me">Summarize this article in 3 bullets.</div>
+                <div class="bub ai">
+                  <b>Here's the gist:</b>
+                  <ul>
+                    <li>SSE streams tokens over a single long-lived HTTP connection.</li>
+                    <li>The client reads an <span class="mono">EventSource</span> and appends as it arrives.</li>
+                    <li>Reconnect logic and backpressure are the main gotchas.</li>
+                  </ul>
+                </div>
+                <div class="chips">
+                  <span class="chip on">Summarize</span>
+                  <span class="chip">Explain</span>
+                  <span class="chip">Rewrite</span>
+                  <span class="chip">Translate</span>
+                </div>
+              </div>
+              <div class="composer">
+                <span>Ask about this page…</span>
+                <span class="kbd">⌘⇧A</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="sec">
+    <div class="wrap">
+      <div class="sec-label">Features</div>
+      <h2>A reading &amp; research copilot, built into the browser</h2>
+      <p class="lead">Made for long-form web content — articles, documentation, technical references, and business pages.</p>
+
+      <div class="feat-grid">
+        <article class="card">
+          <span class="num">01</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 10h16M4 15h10M4 20h7"></path></svg></div>
+          <h3>Reads the page for you</h3>
+          <p>Extracts the readable text of the current tab and uses it as context — no copy-pasting articles, docs, or GitHub pages.</p>
+        </article>
+        <article class="card">
+          <span class="num">02</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4zM14 4v16"></path></svg></div>
+          <h3>Side-panel, per tab</h3>
+          <p>Opens in Chrome's side panel with its own session per tab, so switching pages never mixes conversations.</p>
+        </article>
+        <article class="card">
+          <span class="num">03</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg></div>
+          <h3>Quick actions</h3>
+          <p>One click to summarize, explain, rewrite, translate, simplify, or explain code — on the full page, a selection, or pasted text.</p>
+        </article>
+        <article class="card">
+          <span class="num">04</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11V7a5 5 0 0 1 10 0v4M5 11h14v9H5z"></path></svg></div>
+          <h3>Bring your own key</h3>
+          <p>Use your own OpenAI or OpenRouter key. OpenRouter also unlocks Claude, Gemini, and more model families through one key.</p>
+        </article>
+        <article class="card">
+          <span class="num">05</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 7.5 8 9 4.5-1.5 8-4 8-9V6z"></path></svg></div>
+          <h3>Local-first &amp; private</h3>
+          <p>Keys and chat history are stored locally. Page content is only sent when you ask. Exclude sites or disable history anytime.</p>
+        </article>
+        <article class="card">
+          <span class="num">06</span>
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3m0 12v3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1M3 12h3m12 0h3M5.6 18.4l2.1-2.1m8.6-8.6 2.1-2.1"></path><circle cx="12" cy="12" r="3.2"></circle></svg></div>
+          <h3>Your models, your way</h3>
+          <p>Choose default providers and models, favorite the ones you use, hide the rest. Streamed responses you can stop mid-answer.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROVIDERS -->
+  <section id="providers" class="providers">
+    <div class="wrap">
+      <div class="sec-label" style="display:block;margin-bottom:18px">Providers</div>
+      <p>Plug in your own key for <b>OpenAI</b>, <b>Anthropic</b>, or <b>Google</b> — or route all of them through a single <b>OpenRouter</b> key.</p>
+      <div class="prov-row">
+        <span class="prov"><img src="logo-openai.svg" alt=""><span class="pname2">OpenAI</span><span class="pmodels">GPT</span></span>
+        <span class="prov"><img src="logo-claude.svg" alt=""><span class="pname2">Anthropic</span><span class="pmodels">Claude</span></span>
+        <span class="prov"><img src="logo-gemini.svg" alt=""><span class="pname2">Google</span><span class="pmodels">Gemini</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section id="download" class="sec">
+    <div class="wrap">
+      <div class="sec-label">Download</div>
+      <h2>Three ways to install</h2>
+      <p class="lead">One-click from the Chrome Web Store, or download a build and load it unpacked while the listing is in review.</p>
+
+      <div class="dl-grid">
+        <article class="dl feature">
+          <div class="dl-top"><h3>Chrome Web Store</h3><span class="tag rec">Recommended</span></div>
+          <p class="desc">One-click install with automatic updates. No developer mode required.</p>
+          <span class="pill-soon" style="margin-top:18px;font-size:14px;padding:11px 16px"><span class="ping"></span>Coming soon</span>
+        </article>
+
+        <article class="dl">
+          <div class="dl-top"><h3>Stable build</h3><span class="tag stable">Stable</span></div>
+          <p class="desc">The recommended manual build. Tested and stable.</p>
+          <div class="meta">Not published yet</div>
+          <a href="https://github.com/microDotBuilder/ask-ai/releases/latest" class="btn btn-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"></path></svg>
+            View releases
+          </a>
+        </article>
+
+        <article class="dl">
+          <div class="dl-top"><h3>Alpha build</h3><span class="tag preview">Preview</span></div>
+          <p class="desc">Bleeding-edge preview. New features first — expect rough edges.</p>
+          <div class="meta">Alpha 0.0.0 (ab99656) · 727 KB</div>
+          <a href="https://github.com/microDotBuilder/ask-ai/releases/download/v0.0.0-alpha.20260613.1823/ask-ai-0.0.0-alpha-chrome-mv3.zip" class="btn btn-ghost">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"></path></svg>
+            Download ZIP
+          </a>
+        </article>
+      </div>
+
+      <p class="dl-foot">The same ZIP works on macOS, Windows, and Linux. Requires Chrome 116+. See all builds on
+        <a href="https://github.com/microDotBuilder/ask-ai/releases" target="_blank" rel="noopener">GitHub Releases</a>.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-main">
+      <div class="foot-brand">
+        <a href="#top" class="brand"><span class="mark">A</span><span>Askpane</span></a>
+        <span>— Ask anything about the page you're viewing.</span>
+      </div>
+      <nav class="foot-nav">
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+        <a href="/privacy">Privacy</a>
+        <a href="https://github.com/microDotBuilder/ask-ai" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </div>
+  <div class="foot-fine"><div class="wrap">© 2026 Askpane. Bring-your-own-key · No hosted backend · Open source.</div></div>
+</footer>
+
+</div>
+</body>
+</html>

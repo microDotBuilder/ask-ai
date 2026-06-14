@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "bun --filter @askai/extension dev",
+    "dev:marketing":"bun --filter @askai/website dev",
     "build": "bun run --filter '*' build",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run build",
     "icons:alpha": "bun scripts/generate-extension-icons.ts alpha",
